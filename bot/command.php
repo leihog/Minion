@@ -39,17 +39,6 @@ class Command
             return;
         }
 
-        if ( !isset(self::$commands[$this->name]) )
-        {
-            if ( method_exists($this->event, 'isFromChannel') && $this->event->isFromChannel() )
-            {
-                return;
-            }
-
-            $this->respond('what?');
-            return;
-        }
-
         $method = self::$commands[$this->name];
         $parameters = preg_split("/ (?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/", $this->getParameters(), $method['total']); /** @todo handle single quotes */         
         array_unshift($parameters, $this);
@@ -147,6 +136,16 @@ class Command
         return array_keys(self::$commands);
     }
 
+    public static function has( $name )
+    {
+        if ( isset(self::$commands[$this->name]) )
+        {
+            return true;
+        }
+
+        return false;
+    }
+    
     public static function removeCommandPointers( $class )
     {
         $reflector = new \ReflectionClass($class);

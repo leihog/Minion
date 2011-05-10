@@ -70,6 +70,16 @@ class Irc extends Plugin
             $cmdName = substr($cmdName, 1);
         }
 
+        if ( !\Bot\Command::has($cmdName) )
+        {
+            if ( !$event->isFromChannel() )
+            {
+                $event->getConnection()->doPrivmsg($source, 'What?');
+            }
+
+            return;
+        }
+        
         $cmd = new \Bot\Command( $cmdName, $parameters );
         $cmd->setEvent($event);
         $cmd->execute();
