@@ -138,7 +138,7 @@ class Command
 
     public static function has( $name )
     {
-        if ( isset(self::$commands[$this->name]) )
+        if ( isset(self::$commands[$name]) )
         {
             return true;
         }
