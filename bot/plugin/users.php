@@ -2,7 +2,7 @@
 namespace Bot\Plugin;
 use Bot\Bot;
 
-class Core extends Plugin 
+class Users extends Plugin 
 {
 	/**
 	 * @todo if no password is given then send the syntax.
