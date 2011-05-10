@@ -55,6 +55,27 @@ class Admin extends Plugin
         $cmd->respond("Mem usage(true): {$memusage}");
 	}
 
+	public function cmdPlugins( \Bot\Command $cmd )
+	{
+	    $event = $cmd->getEvent();
+        $hostmask = $event->getHostmask();
+        $nick = $hostmask->getNick();
+        $server = $cmd->getConnection();
+
+	    if ($event->isFromChannel())
+	    {
+	        $server->doPrivmsg($nick, 'Syntax: /msg '. $server->getNick() . ' PLUGINS');
+	        return;
+	    }
+	    
+	    $plugins = Bot::getPluginHandler()->getPlugins();
+	    if ( ($pluginCount = count($plugins)) )
+		{
+		    $server->doPrivmsg($nick, sprintf('%s loaded plugin%s', $pluginCount, ($pluginCount == 1 ? '':'s') ));
+		    $server->doPrivmsg($nick, $this->formatTableArray( $plugins, "%-10s", 4, 15 ));
+		}
+	}
+	
 	public function cmdReload( \Bot\Command $cmd, $plugin, $force = false )
 	{
 	    $event = $cmd->getEvent();

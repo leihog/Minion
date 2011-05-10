@@ -60,6 +60,15 @@ class Handler extends \Bot\Loader
         return false;
     }
     
+    /**
+     * Returns a list of the loaded plugins
+     * @return array
+     */
+    public function getPlugins()
+    {
+        return array_keys($this->plugins);
+    }
+    
     public function hasPlugin( $name )
     {
         if ( !isset($this->plugins[$name]) )
