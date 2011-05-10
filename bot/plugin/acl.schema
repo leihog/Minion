@@ -1,0 +1,5 @@
+CREATE TABLE acl (cmd TEXT, level INTEGER);
+INSERT INTO acl (cmd, level) VALUES ('setacl', 100);
+INSERT INTO acl (cmd, level) VALUES ('load', 100);
+INSERT INTO acl (cmd, level) VALUES ('unload', 100);
+INSERT INTO acl (cmd, level) VALUES ('reload', 100);
