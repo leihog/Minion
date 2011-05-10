@@ -87,6 +87,10 @@ class Bot
 		}
 	}
 
+	/**
+	 * Returns the plugin handler
+	 * @return \Bot\Plugin\Handler
+	 */
 	public static function getPluginHandler()
 	{
 		return self::getInstance()->pluginHandler;
