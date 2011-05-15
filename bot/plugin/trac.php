@@ -30,12 +30,10 @@ class Trac extends Plugin
         }
 	}
 
-	public function cmdTicket( \Bot\Command $cmd, $ticket )
+	public function cmdTicket( \Bot\Event\Irc $event, $ticket )
 	{
-	    $event = $cmd->getEvent();
         $hostmask = $event->getHostmask();
         $nick = $hostmask->getNick();
-	    $server = $cmd->getConnection();
 		
 	    $ticket = ltrim($ticket, '#');
 	    if (!is_numeric($ticket))
@@ -51,11 +49,11 @@ class Trac extends Plugin
 		    $values = preg_split("/,(?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/", $lines[1]);
 		    $ticket = array_combine($keys, $values);
 
-			$server->doPrivmsg($event->getSource(), sprintf( '%s (%s) [%s]', trim($ticket['summary'],'"'), $ticket['status'], $ticketUrl ));
+			$this->doPrivmsg($event->getSource(), sprintf( '%s (%s) [%s]', trim($ticket['summary'],'"'), $ticket['status'], $ticketUrl ));
 		}
 		catch ( \Exception $e )
 		{
-			$server->doPrivmsg($event->getSource(), "Sorry, could not find ticket {$ticket}.");
+			$this->doPrivmsg($event->getSource(), "Sorry, could not find ticket {$ticket}.");
 		}
 	}
 

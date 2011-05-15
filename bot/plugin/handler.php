@@ -16,7 +16,14 @@ class Handler extends \Bot\Loader
     			$plugin = $iterator->current();
     			if (method_exists($plugin, $name))
     			{
-    				call_user_func_array(array($plugin, $name), $params);
+    			    try
+    			    {
+    			        call_user_func_array(array($plugin, $name), $params);
+    			    }
+    				catch( \Exception $e )
+    				{
+    				    echo $e->getMessage(), "\n";
+    				}
     			}
 
 				$iterator->next();

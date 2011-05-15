@@ -10,48 +10,12 @@ class Command
     protected $name;
     protected $parameters;
     protected $event;
-    
-    protected $valid = true;
-    
-    public function __construct( $cmdName, $parameters )
+
+    public function __construct( $event, $cmdName, $parameters )
     {
+        $this->event = $event;
         $this->name = strtolower($cmdName);
         $this->parameters = $parameters;
-    }
-
-    public function checkAcl()
-    {
-        foreach( self::$aclHandlers as &$handler )
-        {
-            if ( !$handler->checkAcl($this) )
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    public function execute()
-    {
-        if ( !$this->checkAcl() )
-        {
-            return;
-        }
-
-        $method = self::$commands[$this->name];
-        $parameters = preg_split("/ (?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/", $this->getParameters(), $method['total']); /** @todo handle single quotes */         
-        array_unshift($parameters, $this);
-
-        try
-        {
-            call_user_func_array($method['pointer'], $parameters);
-        }
-        catch( \Exception $e )
-        {
-            /** @todo send to errorlog */
-            echo $e->getMessage(), "\n";
-        }
     }
 
     public function getName()
@@ -69,25 +33,44 @@ class Command
         return $this->event;
     }
 
-    public function getConnection()
+    // static //
+
+    public static function checkAcl( $cmd )
     {
-        return $this->event->getConnection();
-    }
-    
-    public function respond($string)
-    {
-        if ( $this->getConnection() instanceOf Connection\Server )
+        foreach( self::$aclHandlers as &$handler )
         {
-            $this->getConnection()->doPrivmsg($this->event->getSource(), $string);
+            if ( !$handler->checkAcl($cmd) )
+            {
+                return false;
+            }
         }
+
+        return true;
     }
 
-    public function setEvent( $event )
+    public static function execute( $event, $name, $args )
     {
-        $this->event = $event;
+        if ( !self::checkAcl( new self($event, $name, $args) ) )
+        {
+            return false;
+        }
+
+        $method = self::$commands[$name];
+        $parameters = preg_split("/ (?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/", $args, $method['total']); // @todo handle single quotes         
+        array_unshift($parameters, $event);
+
+        try
+        {
+            call_user_func_array($method['pointer'], $parameters);
+            return true;
+        }
+        catch( \Exception $e )
+        {
+            // @todo send to errorlog
+            echo $e->getMessage(), "\n";
+            return false;
+        }
     }
-        
-    // static //
 
     public static function addAclHandler( $handler )
     {
@@ -102,7 +85,7 @@ class Command
 
         self::$aclHandlers[$name] = $handler;
     }
-    
+
     /**
      * Extracts command pointers from the given class or object
      * 

@@ -52,16 +52,14 @@ class Acl extends Plugin
         return false;
     }
 
-	public function cmdCmds( \Bot\Command $cmd )
+	public function cmdCmds( \Bot\Event\Irc $event )
 	{
-	    $event = $cmd->getEvent();
         $hostmask = $event->getHostmask();
         $nick = $hostmask->getNick();
-	    $server = $cmd->getConnection();
 
         if ($event->isFromChannel())
 	    {
-	        $server->doPrivmsg($nick, 'Syntax: /msg '. $server->getNick() . ' CMDS');
+	        $this->doPrivmsg($nick, 'Syntax: /msg '. $this->getNick() . ' CMDS');
 	        return;
 	    }
 
@@ -83,27 +81,25 @@ class Acl extends Plugin
 
 		if ( ($cmdCount = count($userCmds)) )
 		{
-		    $server->doPrivmsg($nick, sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
-		    $server->doPrivmsg($nick, $this->formatTableArray( $userCmds, "[%3s] %-14s", 4, 20 ));
+		    $this->doPrivmsg($nick, sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
+		    $this->doPrivmsg($nick, $this->formatTableArray( $userCmds, "[%3s] %-14s", 4, 20 ));
 		}
 	}
 
-    public function cmdSetacl( \Bot\Command $cmd, $cmdName, $level = false )
+    public function cmdSetacl( \Bot\Event\Irc $event, $cmdName, $level = false )
     {
-	    $event = $cmd->getEvent();
         $hostmask = $event->getHostmask();
         $nick = $hostmask->getNick();
-	    $server = $cmd->getConnection();
 
     	if ( !$level )
     	{
     		$this->removeAcl($cmdName);
-    		$server->doPrivmsg($nick, "Removed ACL for {$cmdName}.");
+    		$this->doPrivmsg($nick, "Removed ACL for {$cmdName}.");
     	}
     	else
     	{
     		$this->setAcl($cmdName, $level);
-    		$server->doPrivmsg($nick, "Updated ACL for {$cmdName}.");
+    		$this->doPrivmsg($nick, "Updated ACL for {$cmdName}.");
     	}
     }
 

@@ -1,9 +1,6 @@
 <?php
 namespace Bot\Connection;
 
-/**
- * @todo Might want to implement do* functions elsewhere
- */
 class Server extends \Bot\Socket\Client\Stream
 {
 	protected $nick;
@@ -23,85 +20,23 @@ class Server extends \Bot\Socket\Client\Stream
 	{
 		if (parent::connect())
 		{
-			$this->send( $this->prepare('NICK', $this->nick) );
-			$this->send( $this->prepare('USER', $this->username, $this->host, $this->host, $this->realname) );
-			
-			$this->lastChecked = time();
-			$this->allowance = $this->rate;
-		}
-	}
+		    $this->lastChecked = time();
+		    $this->allowance = $this->rate;
 
-	public function doJoin( $channel, $key = '' )
-	{
-		if ( is_array($channel) )
-		{
-			$channels = $keys = array();
-			foreach( $channel as &$chan )
-			{
-				list($c, $k) = array_pad(explode(':', $chan, 2), 2, ' ');
-				$channels[] = $c;
-				$keys[] = $k;
-			}
-			
-			$channel = implode(',', $channels);
-			$key = implode(',', $keys);
+            \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Connect', array( 'socket' => $this ) ));
+
+			return true;
 		}
 
-        $this->send( $this->prepare('JOIN', $channel, $key) );
+		return false;
 	}
 
-	public function doNick( $nick )
+	public function disconnect()
 	{
-	    $this->setNick($nick);
-	    $this->send( $this->prepare('NICK', $nick) );
-	}
-
-	public function doPart( $channel )
-	{
-		if ( is_array($channel) )
-		{
-			$channel = implode(',', $channel);
-		}
-		
-		$this->send( $this->prepare('PART', $channel) );
+	    parent::disconnect();
+	    \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Disconnect', array('socket' => $this) ));
 	}
 	
-	/**
-	 * Send a message to a channel or user
-	 * 
-	 * @param string $target
-	 * @param string|array $msg
-	 */
-	public function doPrivmsg( $target, $msg )
-	{
-	    if ( !is_array($msg) )
-	    {
-	        $msg = array($msg);
-	    }
-
-	    foreach( $msg as &$str )
-	    {
-	        $this->send( $this->prepare('PRIVMSG', array($target, $str)) );
-	    }
-	}
-	
-	public function doQuit( $reason = 'zZz' )
-	{
-		$this->send( $this->prepare('QUIT', array($reason)), true );
-		//$this->disconnect();
-	}
-
-	public function doTopic( $channel, $topic = false )
-	{
-		$args = array($channel);
-		if ($topic)
-		{
-			$args[] = $topic;
-		}
-
-		$this->send( $this->prepare('TOPIC', $args) );
-	}
-
 	// input
 	
 	protected function parseArguments($args, $count = -1)
@@ -245,39 +180,9 @@ class Server extends \Bot\Socket\Client\Stream
 			$this->parseLine(trim($line));
 		}
 	}
-	
+
 	// output
 	
-	/**
-	 * Builds a command with parameters from the argument list
-	 * 
-	 * @param string $cmd
-	 * @param string $arg1, $arg2, $arg3
-	 * @throws \Exception
-	 */
-	public function prepare()
-	{
-		$args = func_get_args();
-		if ( empty($args) )
-		{
-			throw new \Exception('Send() called with no parameters...');
-		}
-
-		$buffer = array_shift($args);
-        if ( !empty($args) )
-        {
-        	if ( count($args) == 1 && is_array($args[0]) )
-        	{
-        		$args = $args[0];
-        		$args[] = ':'. array_pop($args);
-        	}
-
-            $buffer .= ' ' . preg_replace('/\v+/', ' ', implode(' ', $args));
-        }
-
-	    return trim($buffer) . "\r\n";
-	}
-
 	public function processWriteQueue()
 	{
 		if (empty($this->writeQueue))

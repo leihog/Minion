@@ -1,6 +1,7 @@
 <?php
 namespace Bot\Plugin;
 use Bot\Bot as Bot;
+use Bot\Command;
 
 class Irc extends Plugin 
 {
@@ -8,12 +9,10 @@ class Irc extends Plugin
 
     public function on001( \Bot\Event\Irc $event )
     {
-    	$server = $event->getConnection();
-
     	$channels = Bot::getConfig("irc/channels", array());
     	if ( !empty($channels) )
     	{
-			$server->doJoin($channels);
+			$this->doJoin($channels);
 		}
 
         if (!empty($this->altnicks))
@@ -21,7 +20,7 @@ class Irc extends Plugin
             reset($this->altnicks);
         }
     }
-    
+
     public function on433( \Bot\Event\Irc $event )
     {
         list($nick, $desc) = explode(' :', $event->getParams(), 2);
@@ -37,9 +36,18 @@ class Irc extends Plugin
             next($this->altnicks);
         }
 
-        $event->getConnection()->doNick( $newnick );
+        $this->doNick( $newnick );
     }
 
+    public function onConnect( \Bot\Event\Socket $event )
+    {
+        $host = $event->getHost();
+        $irc = Bot::getConfig('irc');
+
+        $this->doNick( $irc['nick'] );
+        $this->getServer()->send( $this->prepare('USER', $irc['username'], $host, $host, $irc['realname']) );
+    }
+    
     /**
      * @todo this should probably be handled in \Bot\Server since it's so essential
      * @param \Bot\Event\Irc $event
@@ -52,8 +60,7 @@ class Irc extends Plugin
     		return;
     	}
 
-		$server = $event->getConnection();
-		$server->send( $server->prepare('PONG', $args[0]) );
+		$this->getServer()->send( $this->prepare('PONG', $args[0]) );
     }
 
     public function onPrivmsg( \Bot\Event\Irc $event )
@@ -70,30 +77,27 @@ class Irc extends Plugin
             $cmdName = substr($cmdName, 1);
         }
 
-        if ( !\Bot\Command::has($cmdName) )
+        if ( !Command::has($cmdName) )
         {
             if ( !$event->isFromChannel() )
             {
-                $event->getConnection()->doPrivmsg($source, 'What?');
+                $this->doPrivmsg($event->getSource(), 'What?');
             }
 
             return;
         }
-        
-        $cmd = new \Bot\Command( $cmdName, $parameters );
-        $cmd->setEvent($event);
-        $cmd->execute();
+
+        Command::execute( $event, $cmdName, $parameters );
     }
     
-    public function cmdHello( \Bot\Command $cmd )
+    public function cmdHello( \Bot\Event\Irc $event )
     {
-        $cmd->getConnection()->doPrivmsg($cmd->getEvent()->getSource(), "Hello, how are you?");
+        $this->doPrivmsg($event->getSource(), "Hello, how are you?");
     }
 
-    public function cmdQuit( \Bot\Command $cmd, $msg = 'zZz' )
+    public function cmdQuit( \Bot\Event\Irc $event, $msg = 'zZz' )
     {
-        /** @todo output "by request of $nick." */
-        $cmd->getConnection()->doQuit( $msg );
+        $this->doQuit( $msg );
     }
 
 }

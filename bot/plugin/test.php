@@ -5,17 +5,17 @@ use Bot\Bot;
 
 class Test extends Plugin 
 {
-    public function cmdTest( $cmd )
+    public function cmdTest( \Bot\Event\Irc $event )
     {
-        $cmd->respond('Testing 1, 2, 3...');
+        $this->doPrivmsg('#lair', 'hej');
     }
 
-    public function cmdVersion( $cmd )
+    public function cmdVersion( \Bot\Event\Irc $event )
     {
-        $cmd->respond('Version: '. get_class($this));
+        $this->doPrivmsg($event->getSource(), 'Version: '. get_class($this));
     }
 
-    public function cmdFormat( $cmd )
+    public function cmdFormat( \Bot\Event\Irc $event )
     {
         $data = array(
             array( 'level' => 5, 'name' => 'godis' ),
@@ -33,7 +33,7 @@ class Test extends Plugin
         $rows = $this->formatTableArray( $data, "[%3s] %-14s", 4, 20 );
         foreach($rows as $row)
         {
-            $cmd->respond($row);
+            $this->doPrivmsg($event->getSource(), $row);
         }
     }
 }

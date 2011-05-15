@@ -96,6 +96,16 @@ class Bot
 		return self::getInstance()->pluginHandler;
 	}
 	
+	public function getServer()
+	{
+	    if ( !$this->serverConnection )
+	    {
+	        return false;
+	    }
+
+	    return $this->serverConnection;
+	}
+
 	/**
 	 * return the socketHandler
 	 * @return Bot\Socket\Handler
@@ -207,12 +217,12 @@ class Bot
 
         @list($transport, $host, $port, $password) = preg_split('@\://|\:@', $server);
         $server = compact('transport', 'host', 'port', 'password');
+        $settings = array_merge($server, Bot::getConfig('irc'));
 
-        $settings = array_merge($server, Bot::getConfig('irc'));    
-        $connection = new Connection\Server($settings);
-        if ( $connection->connect() )
+        $this->serverConnection = new Connection\Server($settings);
+        if ( $this->serverConnection->connect() )
         {
-            $this->serverConnection = $connection;
+            echo "Connected to {$this->serverConnection->getHost()}:{$this->serverConnection->getPort()}\n";
             return true;
         }
         
@@ -233,12 +243,7 @@ class Bot
     }
 
     // Events - Move to plugins later... ?
-    
-    public function onConnect( Event\Socket $event )
-    {
-        echo "Connected to {$event->getHost()}:{$event->getPort()}\n";
-    }
-    
+        
     public function onDisconnect( Event\Socket $event )
     {
         echo "Lost connection to {$event->getHost()}:{$event->getPort()}\n";

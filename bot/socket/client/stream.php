@@ -1,5 +1,6 @@
 <?php
 namespace Bot\Socket\Client;
+use Bot\Bot;
 
 /** @todo should events be handled in SocketHandler instead? */
 abstract class Stream
@@ -22,7 +23,7 @@ abstract class Stream
 			}
 		}
 	}
-	
+
 	/**
 	 * 
 	 * @todo add support for ipv6 host (ipv6 ips must be enclosed in [], ex: 'tcp://[df63::1]:80' )
@@ -41,8 +42,7 @@ abstract class Stream
 
 		stream_set_blocking($this->resource, false);
 		$this->socketId = stream_socket_get_name($this->resource, true);
-		\Bot\Bot::getSocketHandler()->addSocket($this);
-		\Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Connect', array( 'socket' => $this ) ));
+		Bot::getSocketHandler()->addSocket($this);
 
 		return true;
 	}
@@ -50,22 +50,19 @@ abstract class Stream
 	public function disconnect()
 	{
 	    fclose($this->getResource());
-		\Bot\Bot::getSocketHandler()->removeSocket($this);
-		\Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Disconnect', array('socket' => $this) ));
-		
-		/** @todo destroy object */
+		Bot::getSocketHandler()->removeSocket($this);
 	}
-	
+
 	public function getHost()
 	{
 		return $this->host;
 	}
-	
+
 	public function getPort()
 	{
 		return $this->port;
 	}
-	
+
 	/**
 	 * Returns the actual socket resource
 	 * @return resource socket

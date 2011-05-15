@@ -93,9 +93,6 @@ class Handler
 			$id = (int)$id->getResource();
 		}
 
-		//$socket = $this->sockets[$id];
 		unset($this->resources[$id], $this->sockets[$id]);
-
-		//$socket = null;
 	}
 }
