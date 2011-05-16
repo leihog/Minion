@@ -6,6 +6,10 @@ class Irc extends Socket
 	protected $hostmask = false;
 	protected $raw = false;
 	
+	/**
+	 * 
+	 * @return \Bot\Hostmask
+	 */
 	public function getHostmask()
 	{
 		return $this->hostmask;
