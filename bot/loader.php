@@ -7,7 +7,7 @@ abstract class Loader
 
 	/**
 	 * Returns Current version of class
-	 * 
+	 *
 	 * @param string $class
 	 */
 	public function getBlueprint( $class )
@@ -20,16 +20,25 @@ abstract class Loader
 	    return $this->loadClass( $class );
 	}
 
+	/**
+	 * @param string $blueprint
+	 * @return string
+	 */
+	protected function getBlueprintFile( $blueprint )
+	{
+	    return strtolower( str_replace('\\', '/', ltrim($blueprint, '\\') ) ) . '.php';
+	}
+
 	protected function getClass( $blueprint )
 	{
 	    return substr($blueprint, 0, strrpos($blueprint, '_'));
 	}
-	
+
 	/**
 	 * returns a qualified class name (class name including namespace)
-	 * If $class is namespaced it's returned as is, 
+	 * If $class is namespaced it's returned as is,
 	 * if not then it's prepended with $namespace.
-	 * 
+	 *
 	 * @param string $class
 	 * @param string $namespace
 	 */
@@ -39,15 +48,15 @@ abstract class Loader
 	    {
 	        $class = $namespace . '\\' . $class;
 	    }
-	    
+
 	    return $class;
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * @todo Add support for 'implements'
-	 * @todo not sure i like forceReload, perhaps it should be replaced by something else. 
-	 * 
+	 * @todo not sure i like forceReload, perhaps it should be replaced by something else.
+	 *
 	 * @param string $blueprint
 	 * @throws \Exception
 	 */
@@ -58,7 +67,7 @@ abstract class Loader
 	        $blueprint = '\\' . $blueprint;
 	    }
 
-	    $blueprintFile = strtolower( str_replace('\\', '/', ltrim($blueprint, '\\') ) ) . '.php';
+	    $blueprintFile = $this->getBlueprintFile($blueprint);
 	    $contents = file_get_contents( $blueprintFile );
 
 	    $fingerprint = sha1($contents);
@@ -74,7 +83,7 @@ abstract class Loader
 	        }
 
 	        echo "Class '{$qualifiedClass}' already loaded... force reloading.\n";
-	        
+
             $fingerprint = time();
     	    $blueprintClass = substr($blueprint, strrpos($blueprint, '\\')+1) . '_' . $fingerprint;
     	    $qualifiedClass = $blueprint . '_' . $fingerprint;
@@ -94,7 +103,7 @@ abstract class Loader
                 if ($token[0] == T_CLASS || $token[0] == T_EXTENDS)
                 {
                     $type = $token[0];
-                    
+
                     while ($token && (!is_array($token) || $token[0] != T_STRING))
                     {
                         $contents .= (is_array($token) ? $token[1] : $token);
@@ -140,9 +149,9 @@ abstract class Loader
         {
             throw new \Exception("Failed to load {$qualifiedClass} using {$blueprint} from {$blueprintFile}.");
         }
-        
+
         $this->addBlueprint($blueprint, $qualifiedClass);
-        
+
         return $qualifiedClass;
 	}
 
@@ -182,17 +191,16 @@ abstract class Loader
 
 	    return false;
 	}
-	
+
 	/**
 	 * Creates an instance of $class using the stored blueprint (classname)
-	 * 
-	 * 
+	 *
 	 * @param string $class
 	 */
 	public function cloneObject( $class )
 	{
-	    $class = $this->getBlueprint( $class );
+        $class = $this->getBlueprint( $class );
 	    return new $class();
 	}
-			 
+
 }

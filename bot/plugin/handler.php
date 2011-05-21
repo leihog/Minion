@@ -4,6 +4,27 @@ namespace Bot\Plugin;
 class Handler extends \Bot\Loader
 {
     protected $plugins = array();
+    protected $pluginPath;
+
+    public function __construct( $path )
+    {
+        $this->pluginPath = rtrim($path, '/') . '/';
+    }
+
+    /**
+     * @todo needs improvement
+     * @see Bot\Loader::getBlueprintFile()
+     */
+    public function getBlueprintFile( $blueprint )
+    {
+        $class = substr($blueprint, strrpos($blueprint, '\\')+1);
+        if ($class == 'Plugin' )
+        {
+            return __DIR__ . "/plugin.php";
+        }
+
+        return $this->pluginPath . $class . '.php';
+    }
 
     public function __call($name, $params)
     {
@@ -39,12 +60,12 @@ class Handler extends \Bot\Loader
             {
                 $plugin = $this->cloneObject( '\Bot\Plugin\\' . $name );
                 $this->plugins[ $name ] = $plugin;
-    
+
                 if ( method_exists($plugin, 'init') )
                 {
                     $plugin->init();
                 }
-    
+
                 \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Plugin('loadplugin', array('plugin' => $plugin)) );
                 return true;
             }
@@ -63,10 +84,10 @@ class Handler extends \Bot\Loader
         {
             return $this->plugins[$name];
         }
-        
+
         return false;
     }
-    
+
     /**
      * Returns a list of the loaded plugins
      * @return array
@@ -75,14 +96,14 @@ class Handler extends \Bot\Loader
     {
         return array_keys($this->plugins);
     }
-    
+
     public function hasPlugin( $name )
     {
         if ( !isset($this->plugins[$name]) )
         {
             return false;
         }
-        
+
         return true;
     }
 
@@ -97,13 +118,13 @@ class Handler extends \Bot\Loader
     	{
 			$this->unloadPlugin($name);
 			$this->loadPlugin($name);
-			
+
 			return true;
     	}
-    	
+
     	return false;
     }
-    
+
     public function unloadPlugin( $name )
     {
     	if ($this->hasPlugin($name))

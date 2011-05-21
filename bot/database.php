@@ -10,17 +10,17 @@ class Database
         'plugins' => 'CREATE TABLE plugins (id INTEGER, plugin TEXT, PRIMARY KEY(id ASC))',
         'plugin_tables' => 'CREATE TABLE plugin_tables (plugin INTEGER, tablename TEXT)',
     );
-    
+
     public function __construct()
     {
         if (!extension_loaded('PDO') || !extension_loaded('pdo_sqlite'))
         {
             throw new \Exception('PDO and pdo_sqlite extensions must be installed');
         }
-        
+
         $this->initialize();
     }
-    
+
     public function execute( $query, $params = array() )
     {
     	try
@@ -36,10 +36,10 @@ class Database
     	{
     	    /** @todo log or report errors... */
     	}
-    	
+
     	return false;
     }
-    
+
     public function fetch( $query, $params = array() )
     {
         try
@@ -71,7 +71,7 @@ class Database
 
         return false;
     }
-    
+
     public function fetchColumn( $query, $params )
     {
         try
@@ -87,7 +87,7 @@ class Database
 
         return false;
     }
-    
+
     public function fetchScalar( $query, $params = array() )
     {
         try
@@ -100,19 +100,19 @@ class Database
         {
             /** @todo log or report errors... */
         }
-        
+
     }
-    
+
     /**
      * Enter description here ...
      * @param dbFile
-     * @param 
+     * @param
      */
 	protected function initialize()
 	{
-		$dbFile = Bot::getConfig('data-dir', 'data') . '/bot.db';
+		$dbFile = Bot::getDir('data') . '/bot.db';
 		$this->db = new \PDO('sqlite:' . $dbFile);
-		
+
 		foreach(array_keys($this->internalTables) as $table)
 		{
 			if (!$this->hasTable($table))
@@ -121,33 +121,23 @@ class Database
 			}
 		}
 	}
-    
+
 	public function install( $name, $schema )
 	{
-/** @todo validate $schema, no ../ or ; or other funny business */
 	    $fp = null;
 	    $tables = array();
-	    $locations = array( 'bot/plugin/', "bot/plugin/{$name}/" );
-	    foreach( $locations as $location )
-	    {
-	        $filename = $location . $schema;
-    	    if ( file_exists($filename) )
-    	    {
-    	        $fp = fopen($filename, 'r');
-    	    }
-	    }
-	    
-	    if (!$fp)
+
+	    if ( !file_exists($schema) || ($fp = fopen($schema, 'r')) === false )
 	    {
 	        throw new \Exception('Unable to open schema for reading');
 	    }
-	    
+
 	    $i = 0;
 	    while ( ($line = fgets($fp)) !== false)
 	    {
 	        $i++;
 	        $line = strtolower($line);
-	        
+
 	        if ( preg_match('/^create\stable\s([a-z0-9_]+)\s.*;$/', $line, $m) )
 	        {
 	            if ( $this->hasTable($m[1]) )
@@ -182,7 +172,7 @@ class Database
 	    {
     	    $this->execute('INSERT INTO plugins (plugin) VALUES(?)', array($name));
     	    $pluginId = $this->lastInsertId();
-    	    
+
     	    foreach($tables as $table)
     	    {
     	        $this->execute('INSERT INTO plugin_tables (plugin, tablename) VALUES (?, ?)', array($pluginId, $table));
@@ -199,7 +189,7 @@ class Database
 
 	    return true;
 	}
-	
+
 	/**
 	 * Returns the plugin that created the table
 	 */
@@ -207,7 +197,7 @@ class Database
 	{
 	    return $this->fetchScalar('SELECT a.plugin FROM plugins as a JOIN plugin_tables as b ON a.id=b.plugin WHERE b.tablename = ? LIMIT 1', array($tableName));
 	}
-	
+
     /**
      * Determines if a table exists
      *
@@ -217,10 +207,10 @@ class Database
      */
     protected function hasTable($name)
     {
-        $sql = 'SELECT COUNT(*) FROM sqlite_master WHERE name = ' . $this->db->quote($name);            
+        $sql = 'SELECT COUNT(*) FROM sqlite_master WHERE name = ' . $this->db->quote($name);
         return (bool) $this->db->query($sql)->fetchColumn();
     }
-	
+
     protected function createTable($name)
     {
         $sql = $this->internalTables[$name];

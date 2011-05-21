@@ -5,6 +5,11 @@ class Bot
 {
 	protected static $instance;
 
+	/** @var string Path to bots working directory */
+	protected $workingDirectory;
+	protected $dataDirectory;
+	protected $pluginDirectory;
+
     protected $config;
     protected $database;
     protected $pluginHandler;
@@ -12,7 +17,7 @@ class Bot
     protected $engineOn;
     protected $eventHandler;
     protected $socketHandler;
-    
+
     protected $serverConnection = null;
 
 	public function __construct()
@@ -20,7 +25,33 @@ class Bot
 		set_time_limit(0);
 		self::$instance = $this;
 
-		spl_autoload_register( array($this, 'autoLoadClass') );       
+		spl_autoload_register( array($this, 'autoLoadClass') );
+
+    	if ( $_SERVER['argc'] != 2 )
+    	{
+    		$this->showHelp();
+    	}
+
+    	$this->workingDirectory = rtrim($_SERVER['argv'][1], '/');
+    	if ( !is_dir($this->workingDirectory) || !is_readable($this->workingDirectory) )
+    	{
+    	    echo "Error: Invalid bot path. \n";
+    	    $this->showHelp();
+    	}
+
+        $this->dataDirectory = $this->workingDirectory . "/data";
+    	if ( !is_dir($this->dataDirectory) || !is_writable($this->dataDirectory) )
+    	{
+    	    echo "Error: Invalid data directory. make sure that '{$this->dataDirectory}' exists and is writable by the bot. \n";
+    	    $this->showHelp();
+    	}
+
+    	$this->pluginDirectory = $this->workingDirectory . "/plugins";
+    	if ( !is_dir($this->pluginDirectory) )
+    	{
+    	    echo "Error: Invalid plugins directory. make sure that '{$this->pluginDirectory}' exists. \n";
+    	    $this->showHelp();
+    	}
 
         $this->init();
 	}
@@ -43,7 +74,7 @@ class Bot
     	{
     		echo $e->getMessage(), "\n";
     	}
-    	
+
     	echo '(ERROR) Failed to load ', $class, ' from file ', $classFile, "\n";
     	return false;
     }
@@ -59,12 +90,30 @@ class Bot
     }
 
     /**
-     * 
+     *
      * @return \Bot\Database
      */
     public static function getDatabase()
     {
         return self::getInstance()->database;
+    }
+
+    public static function getDir( $name = '' )
+    {
+        $obj = self::getInstance();
+
+        if ( !empty($name) )
+        {
+            $prop = "{$name}Directory";
+            if ( property_exists($obj, $prop) )
+            {
+                return $obj->$prop;
+            }
+
+            return $obj->workingDirectory . DIRECTORY_SEPARATOR . $name;
+        }
+
+        return $obj->workingDirectory;
     }
 
     /**
@@ -74,7 +123,7 @@ class Bot
 	{
 		return self::getInstance()->eventHandler;
 	}
-    
+
 	/**
 	 * For convenience, not a real singleton tho.
 	 * @return Bot
@@ -95,7 +144,7 @@ class Bot
 	{
 		return self::getInstance()->pluginHandler;
 	}
-	
+
 	public function getServer()
 	{
 	    if ( !$this->serverConnection )
@@ -119,22 +168,9 @@ class Bot
     {
     	try
     	{
-	    	if ( $_SERVER['argc'] != 2 )
-	    	{
-	    		throw new \Exception('Syntax: bot.php <config file>');
-	    		return;
-	    	}
-	    	$configFile = $_SERVER['argv'][1];
-
+	    	$configFile = $this->workingDirectory . "/config.php";
 	    	$this->config = new Config\Native();
     		$this->config->load($configFile);
-
-    		//check if data directory exists and is read/writeable
-    		$dataDirectory = $this->config->get('data-dir', 'data');
-            if ( (!is_dir($dataDirectory) && !mkdir($dataDirectory, 0655) ) || !is_writable($dataDirectory) || !is_readable($dataDirectory) )
-    		{
-    			throw new \Exception('Invalid data directory.');
-    		}
 
     		echo "Booting up... \n";
 
@@ -142,11 +178,11 @@ class Bot
     		$this->database = new Database();
     		$this->eventHandler = new Event\Handler();
     		$this->socketHandler = new Socket\Handler();
-    		$this->pluginHandler = new Plugin\Handler();
+    		$this->pluginHandler = new Plugin\Handler( $this->pluginDirectory );
 
     		$this->eventHandler->addEventListener( $this->pluginHandler );
     		$this->eventHandler->addEventListener( $this );
-			
+
 
     		$plugins = $this->config->get('autoload');
     		foreach($plugins as $plugin)
@@ -161,7 +197,7 @@ class Bot
         	echo $e->getMessage(), "\n";
         }
     }
-    
+
     /**
      * The legendary main loop
      */
@@ -172,8 +208,8 @@ class Bot
         $servers = Bot::getConfig('servers');
 
         while( $this->engineOn )
-        {            
-            if ( !$this->serverConnection && (time() - $lastRetry) >= Bot::getConfig('server-cycle-wait', 60) )
+        {
+            if ( !$this->serverConnection && (Bot::getConfig('server-cycle-wait', 60) + $lastRetry) <= time() )
             {
                 if ( ($server = current($servers)) !== false )
                 {
@@ -211,13 +247,13 @@ class Bot
         }
     }
 
-    protected function serverConnect( $server )
+    protected function serverConnect( $serverAddress )
     {
         echo "Connecting to $server.\n";
 
-        @list($transport, $host, $port, $password) = preg_split('@\://|\:@', $server);
-        $server = compact('transport', 'host', 'port', 'password');
-        $settings = array_merge($server, Bot::getConfig('irc'));
+        @list($transport, $host, $port, $password) = preg_split('@\://|\:@', $serverAddress);
+        $serverAddress = compact('transport', 'host', 'port', 'password');
+        $settings = array_merge($serverAddress, Bot::getConfig('irc'));
 
         $this->serverConnection = new Connection\Server($settings);
         if ( $this->serverConnection->connect() )
@@ -225,8 +261,22 @@ class Bot
             echo "Connected to {$this->serverConnection->getHost()}:{$this->serverConnection->getPort()}\n";
             return true;
         }
-        
+        else
+        {
+            $this->serverConnection = null;
+        }
+
         return false;
+    }
+
+    /**
+     * Display Bot help and exit
+     * @return void
+     */
+    protected function showHelp()
+    {
+        echo "Syntax: bot.php <bot path> \n";
+        exit();
     }
 
     /**
@@ -242,12 +292,13 @@ class Bot
         $this->engineOn = false;
     }
 
-    // Events - Move to plugins later... ?
-        
     public function onDisconnect( Event\Socket $event )
     {
         echo "Lost connection to {$event->getHost()}:{$event->getPort()}\n";
-        /** @todo attempt to reconnect x times */
+        if ( $event->getSocket() instanceOf \Bot\Connection\Server )
+        {
+            $this->serverConnection = null;
+        }
     }
 
     public function onLoadPlugin( \Bot\Event\Plugin $event )
@@ -262,7 +313,7 @@ class Bot
     {
         $plugin = $event->getPlugin();
         Command::removeCommandPointers($plugin);
-        Command::removeAclHandler($plugin); // an alternative would be to allow the plugin to unset itself. But then plugin authors could forget.
+        Command::removeAclHandler($plugin);
 
         echo "Unloaded plugin {$plugin->getName()}... \n";
     }

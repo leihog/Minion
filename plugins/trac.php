@@ -8,7 +8,6 @@ class Trac extends Plugin
 	{
 		if ( !extension_loaded('SimpleXML') )
 		{
-			/** @todo handle dependency checking in a better way. A plugin with a failed dependency should be disabled without crashing the bot. */
 			throw new \Exception('SimpleXML php extension is required');
 		}
 	}

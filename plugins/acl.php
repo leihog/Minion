@@ -2,7 +2,7 @@
 namespace Bot\Plugin;
 use Bot\Bot;
 
-class Acl extends Plugin 
+class Acl extends Plugin
 {
     protected $accessControlList;
     protected $defaultCommandLevel;
@@ -18,12 +18,12 @@ class Acl extends Plugin
         {
             echo "Installing plugin ", $this->getName(), "\n";
             $db = Bot::getDatabase();
-            $db->install( $this->getName(), 'acl.schema' );
+            $db->install( $this->getName(), __DIR__ . '/acl.schema' );
         }
-        
+
         $this->loadAcl();
         \Bot\Command::addAclHandler( $this );
-        
+
         echo "Acl loaded with ", count($this->accessControlList), " commands.\n";
     }
 
@@ -112,7 +112,7 @@ class Acl extends Plugin
     	    $this->accessControlList[ $acl['cmd'] ] = $acl['level'];
     	}
     }
-    
+
     protected function removeAcl($cmd)
     {
     	if ( isset($this->accessControlList[$cmd]) )
@@ -124,11 +124,11 @@ class Acl extends Plugin
 
     	return false;
     }
-    
+
     protected function setAcl($cmd, $level)
     {
     	$db = Bot::getDatabase();
-    	
+
     	if ( isset($this->accessControlList[$cmd]) )
     	{
     		if ( $this->accessControlList[$cmd] != $level )
