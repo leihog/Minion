@@ -3,18 +3,12 @@ namespace Bot\Plugin;
 use Bot\Bot as Bot;
 use Bot\Command;
 
-class Irc extends Plugin 
+class Irc extends Plugin
 {
     protected $altnicks;
 
     public function on001( \Bot\Event\Irc $event )
     {
-    	$channels = Bot::getConfig("irc/channels", array());
-    	if ( !empty($channels) )
-    	{
-			$this->doJoin($channels);
-		}
-
         if (!empty($this->altnicks))
         {
             reset($this->altnicks);
@@ -23,8 +17,8 @@ class Irc extends Plugin
 
     public function on433( \Bot\Event\Irc $event )
     {
-        list($nick, $desc) = explode(' :', $event->getParams(), 2);
-        
+        list($nick, $desc) = explode(' :', $event->getParam(0), 2);
+
         $this->altnicks = Bot::getConfig('plugins/irc/altnicks', false);
         if ( !$this->altnicks || !current($this->altnicks) )
         {
@@ -47,7 +41,7 @@ class Irc extends Plugin
         $this->doNick( $irc['nick'] );
         $this->getServer()->send( $this->prepare('USER', $irc['username'], $host, $host, $irc['realname']) );
     }
-    
+
     /**
      * @todo this should probably be handled in \Bot\Server since it's so essential
      * @param \Bot\Event\Irc $event
@@ -89,15 +83,10 @@ class Irc extends Plugin
 
         Command::execute( $event, $cmdName, $parameters );
     }
-    
+
     public function cmdHello( \Bot\Event\Irc $event )
     {
         $this->doPrivmsg($event->getSource(), "Hello, how are you?");
-    }
-
-    public function cmdQuit( \Bot\Event\Irc $event, $msg = 'zZz' )
-    {
-        $this->doQuit( $msg );
     }
 
 }

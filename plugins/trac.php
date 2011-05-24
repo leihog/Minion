@@ -2,7 +2,7 @@
 namespace Bot\Plugin;
 use Bot\Bot;
 
-class Trac extends Plugin 
+class Trac extends Plugin
 {
 	public function init()
 	{
@@ -23,9 +23,7 @@ class Trac extends Plugin
         {
             $tid = $match[1];
 
-            $cmd = new \Bot\Command( 'ticket', $tid );
-            $cmd->setEvent($event);
-            $cmd->execute();
+            \Bot\Command::execute( $event, 'ticket', $tid );
         }
 	}
 
@@ -33,7 +31,7 @@ class Trac extends Plugin
 	{
         $hostmask = $event->getHostmask();
         $nick = $hostmask->getNick();
-		
+
 	    $ticket = ltrim($ticket, '#');
 	    if (!is_numeric($ticket))
 	    {
@@ -58,7 +56,7 @@ class Trac extends Plugin
 
 	/**
 	 * @todo perhaps this should accessible by all plugins.
-	 * 
+	 *
 	 * @param string $url
 	 */
 	protected function getUrl( $url )
@@ -82,7 +80,7 @@ class Trac extends Plugin
 
 	    $response = curl_exec($ch);
         curl_close($ch);
-	    
+
         return $response;
 	}
 }

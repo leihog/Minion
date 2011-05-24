@@ -1,0 +1,1 @@
+CREATE TABLE seen (id INTEGER, nick VARCHAR(25), hostmask TEXT, channel VARCHAR(45), action SHORTINT, added INTEGER, PRIMARY KEY(id ASC));

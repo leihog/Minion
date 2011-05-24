@@ -6,7 +6,7 @@ class Server extends \Bot\Socket\Client\Stream
 	protected $nick;
 	protected $realname;
 	protected $username;
-	
+
 	protected $buffer = ''; // used when reading input
 	protected $writeQueue = array();
 
@@ -36,56 +36,56 @@ class Server extends \Bot\Socket\Client\Stream
 	    parent::disconnect();
 	    \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Disconnect', array('socket' => $this) ));
 	}
-	
+
 	// input
-	
+
 	protected function parseArguments($args, $count = -1)
     {
         return preg_split('/ :?/S', $args, $count);
     }
-	
+
     protected function parseLine( $line )
     {
     	if (empty($line))
     	{
     		return;
     	}
-    	
+
     	$raw = $line;
-    	
+
     	$hostmask = '';
     	if ( $line[0] == ':' )
     	{
     		list($hostmask, $line) = explode(' ', $line, 2);
     		$hostmask = substr($hostmask, 1);
     	}
-    	
+
 		list($cmd, $args) = array_pad(explode(' ', $line, 2), 2, null); // not sure the array_pad is needed.
 		$cmd = strtolower($cmd);
-		
+
 		switch( $cmd )
 		{
-	        case 'names':
+	        case 'error':
+		    case 'join':
+            case 'names':
 	        case 'nick':
-	        case 'quit':
+            case 'part':
 	        case 'ping':
 	        case 'pong':
-	        case 'error':
+	        case 'quit':
 	            $args = array_filter(array(ltrim($args, ':')));
 	            break;
-	
+
 	        case 'privmsg':
 	        case 'notice':
 	            $this->parseMsg( $cmd, $args );
 	        	break;
-	
+
 	        case 'topic':
-	        case 'part':
 	        case 'invite':
-	        case 'join':
 	            $args = $this->parseArguments($args, 2);
 	            break;
-	
+
 	        case 'kick':
 	        case 'mode':
 	            $args = $this->parseArguments($args, 3);
@@ -98,14 +98,12 @@ class Server extends \Bot\Socket\Client\Stream
 	            }
 	            else
 	            {
-	                $args = ltrim( substr($args, strpos($args, ' ')), ' :=');
+	                $args = array( ltrim( substr($args, strpos($args, ' ')), ' :=') );
 	            }
 
 	            break;
 		} //end switch
 
-		//echo $raw, "\n";
-		
 		$event = new \Bot\Event\Irc($cmd, $args);
 		$event->setRaw($raw);
 		$event->setSocket($this);
@@ -117,7 +115,7 @@ class Server extends \Bot\Socket\Client\Stream
 
 		\Bot\Bot::getEventHandler()->raise( $event );
     }
-    
+
 	protected function parseMsg( &$cmd, &$args )
 	{
 		$args = $this->parseArguments($args, 2);
@@ -148,10 +146,10 @@ class Server extends \Bot\Socket\Client\Stream
 			}
 		}
 	}
-	
+
 	/**
 	 * Handles socket input and raises events.
-	 * 
+	 *
 	 * @see Bot\Socket\Client.Stream::read()
 	 */
 	public function read()
@@ -168,7 +166,7 @@ class Server extends \Bot\Socket\Client\Stream
 		{
 			$incompleteRead = true;
 		}
-		
+
 		$buffer = preg_split('/\v+/', $buffer);
 		if ( $incompleteRead )
 		{
@@ -182,7 +180,7 @@ class Server extends \Bot\Socket\Client\Stream
 	}
 
 	// output
-	
+
 	public function processWriteQueue()
 	{
 		if (empty($this->writeQueue))
@@ -192,7 +190,7 @@ class Server extends \Bot\Socket\Client\Stream
 
 		$now = time();
 		$timePassed = ($now - $this->lastChecked);
-		$this->lastChecked = $now; 
+		$this->lastChecked = $now;
 		$this->allowance += ( $timePassed * ($this->rate / $this->per) );
 		if ($this->allowance > $this->rate)
 		{
@@ -214,18 +212,19 @@ class Server extends \Bot\Socket\Client\Stream
 			}
 		}
 	}
-	
+
 	/**
 	 * Adds $string to the send queue
 	 * If $skipQueue is true then $string is sent right away.
-	 * 
+	 *
 	 * @param string $string
 	 * @param boolean $skipQueue
-	 * 
+	 *
 	 * @see Bot\Socket\Client.Stream::write()
 	 */
 	public function send( $string, $skipQueue = false )
 	{
+	    $string .= "\r\n";
         if ( $skipQueue )
         {
             try
@@ -236,7 +235,7 @@ class Server extends \Bot\Socket\Client\Stream
             {
                 echo "Failed to write\n", $e->getMessage(), "\n";
             }
-            
+
             return;
         }
 
@@ -244,25 +243,25 @@ class Server extends \Bot\Socket\Client\Stream
 	}
 
 	// getters / setters
-	
+
 	public function getNick()
 	{
 	    return $this->nick;
 	}
-	
+
 	public function setNick( $nick )
 	{
 		$this->nick = $nick;
 	}
-	
+
 	public function setRealname( $realname )
 	{
 		$this->realname = $realname;
 	}
-	
+
 	public function setUsername( $username )
 	{
-		$this->username = $username; 
+		$this->username = $username;
 	}
 
 }

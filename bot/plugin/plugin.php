@@ -3,7 +3,7 @@ namespace Bot\Plugin;
 
 abstract class Plugin
 {
-    
+
 	public function doJoin( $channel, $key = '' )
 	{
 		if ( is_array($channel) )
@@ -35,13 +35,13 @@ abstract class Plugin
 		{
 			$channel = implode(',', $channel);
 		}
-		
+
 		$this->getServer()->send( $this->prepare('PART', $channel) );
 	}
-	
+
 	/**
 	 * Send a message to a channel or user
-	 * 
+	 *
 	 * @param string $target
 	 * @param string|array $msg
 	 */
@@ -57,7 +57,7 @@ abstract class Plugin
 	        $this->getServer()->send( $this->prepare('PRIVMSG', array($target, $str)) );
 	    }
 	}
-    
+
 	public function doTopic( $channel, $topic = false )
 	{
 		$args = array($channel);
@@ -68,12 +68,17 @@ abstract class Plugin
 
 		$this->getServer()->send( $this->prepare('TOPIC', $args) );
 	}
-    
+
 	public function doQuit( $reason = 'zZz' )
 	{
 		$this->getServer()->send( $this->prepare('QUIT', array($reason)), true );
 	}
-    
+
+	public function doRaw( $msg )
+	{
+	    $this->getServer()->send( $msg );
+	}
+
     /**
      * This will break if the class doesn't have the added fingerprint AND has an _ in the name.
      * This should never happen since the pluginHandler will always use blueprints.
@@ -93,7 +98,7 @@ abstract class Plugin
     {
         return $this->getServer()->getNick();
     }
-    
+
     /**
      * Returns the server object.
      * @return \Bot\Connection\Server
@@ -102,12 +107,12 @@ abstract class Plugin
     {
         return \Bot\Bot::getInstance()->getServer();
     }
-    
+
     /**
      * Returns an array of formated rows
-     * 
+     *
      * @todo make it handle utf-8 strings, right now padding + utf-8 = fail
-     * 
+     *
      * @param unknown_type $data
      * @param unknown_type $format
      * @param unknown_type $columns
@@ -122,7 +127,7 @@ abstract class Plugin
         {
             ++$i;
             $buffer[] = vsprintf( $format, $item );
-            
+
             if (count($buffer) == $columns || $i >= count($data))
             {
                 $lineFormat = str_repeat("%-{$columnWidth}s ", count($buffer));
@@ -136,9 +141,9 @@ abstract class Plugin
 
 	/**
 	 * Builds a command with parameters from the argument list
-	 * 
+	 *
 	 * @todo perhaps we should abandon this.
-	 * 
+	 *
 	 * @param string $cmd
 	 * @param string $arg1, $arg2, $arg3
 	 * @throws \Exception
@@ -163,7 +168,7 @@ abstract class Plugin
             $buffer .= ' ' . preg_replace('/\v+/', ' ', implode(' ', $args));
         }
 
-	    return trim($buffer) . "\r\n";
+	    return trim($buffer);// . "\r\n";
 	}
-    
+
 }

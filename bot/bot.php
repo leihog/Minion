@@ -249,7 +249,7 @@ class Bot
 
     protected function serverConnect( $serverAddress )
     {
-        echo "Connecting to $server.\n";
+        echo "Connecting to $serverAddress.\n";
 
         @list($transport, $host, $port, $password) = preg_split('@\://|\:@', $serverAddress);
         $serverAddress = compact('transport', 'host', 'port', 'password');

@@ -3,7 +3,7 @@ namespace Bot\Plugin;
 use Bot\Bot;
 /**
  * Administrator commands.
- * 
+ *
  * Warning: You might not want to run this plugin in a live environment!
  */
 class Admin extends Plugin
@@ -43,10 +43,10 @@ class Admin extends Plugin
 	public function cmdMemstat( \Bot\Event\Irc $event )
 	{
 	    $source = $event->getSource();
-	    
+
         $size = memory_get_usage();
         $unit = array('b','kb','mb','gb','tb','pb');
-        $memusage = @round($size/pow(1024,($i=floor(log($size ,1024)))),2).' '.$unit[$i];        
+        $memusage = @round($size/pow(1024,($i=floor(log($size ,1024)))),2).' '.$unit[$i];
         $this->doPrivmsg($source, "Mem usage: {$memusage}");
 
         $size = memory_get_usage(true);
@@ -65,7 +65,7 @@ class Admin extends Plugin
 	        $this->doPrivmsg($nick, 'Syntax: /msg '. $this->getNick() . ' PLUGINS');
 	        return;
 	    }
-	    
+
 	    $plugins = Bot::getPluginHandler()->getPlugins();
 	    if ( ($pluginCount = count($plugins)) )
 		{
@@ -73,7 +73,7 @@ class Admin extends Plugin
 		    $this->doPrivmsg($nick, $this->formatTableArray( $plugins, "%-10s", 4, 15 ));
 		}
 	}
-	
+
 	public function cmdReload( \Bot\Event\Irc $event, $plugin, $force = false )
 	{
         $hostmask = $event->getHostmask();
@@ -107,6 +107,12 @@ class Admin extends Plugin
 	    }
 	}
 
+	public function cmdShutdown()
+	{
+	    $this->doQuit('Shutting down...');
+	    Bot::getInstance()->shutdown();
+	}
+
 	public function cmdUnload( \Bot\Event\Irc $event, $plugin )
 	{
         $hostmask = $event->getHostmask();
@@ -121,5 +127,5 @@ class Admin extends Plugin
 	    Bot::getPluginHandler()->unloadPlugin($plugin);
 	    $this->doPrivmsg($nick, "Unloaded plugin '{$plugin}'.");
 	}
-    
+
 }
