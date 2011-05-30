@@ -4,6 +4,11 @@ use Bot\Bot;
 
 class Seen extends Plugin
 {
+    const ACTION_JOIN = 1;
+    const ACTION_PART = 2;
+    const ACTION_QUIT = 3;
+    const ACTION_KICK = 4;
+    const ACTION_NICK = 5;
 
     public function init()
     {
@@ -17,19 +22,49 @@ class Seen extends Plugin
 
     public function onJoin( \Bot\Event\Irc $event )
     {
-
+        $hostmask = $event->getHostmask();
+        if ( $hostmask->getNick() != $this->getNick() )
+        {
+            $this->registerAction( $hostmask, $event->getParam(0), self::ACTION_JOIN );
+        }
     }
 
-    public function onNick( \Bot\Event\Irc $event )
+    public function onCNick( \Bot\Event\Event $event )
     {
+        $hostmask = $event->getParam(0);
+        $newNick = $event->getParam(1);
+        $channels = $event->getParam(2);
+
+        $newHostmask = new \Bot\Hostmask("{$newNick}!{$hostmask->getUsername()}@{$hostmask->getHost()}");
+
+        foreach( $channels as $chan )
+        {
+            $this->registerAction( $hostmask, $chan, self::ACTION_PART );
+            $this->registerAction( $newHostmask, $chan, self::ACTION_JOIN );
+        }
     }
 
     public function onPart( \Bot\Event\Irc $event )
     {
+        $hostmask = $event->getHostmask();
+        if ( $hostmask->getNick() != $this->getNick() )
+        {
+            $this->registerAction( $hostmask, $event->getParam(0), self::ACTION_PART );
+        }
     }
 
-    public function onQuit( \Bot\Event\Irc $event )
+    public function onCQuit( \Bot\Event\Event $event )
     {
+        $hostmask = $event->getParam(0);
+        $channels = $event->getParam(1);
+
+        if ( $hostmask->getNick() != $this->getNick() )
+        {
+            foreach( $channels as &$channel )
+            {
+                $this->registerAction( $hostmask, $channel, self::ACTION_QUIT );
+            }
+        }
     }
 
     public function cmdSeen( \Bot\Event\Irc $event, $user )
@@ -58,7 +93,7 @@ class Seen extends Plugin
             return;
         }
 
-        if ( Bot::getPluginHandler()->getPlugin('channel')->isOn($user, $channel) ) // if user is online right now, requires a method of determining if a user is on a channel
+        if ( Bot::getPluginHandler()->getPlugin('channel')->isOn($user, $channel) )
         {
             $this->doPrivmsg($source, "I see {$user} right now.");
             return;
@@ -89,6 +124,24 @@ class Seen extends Plugin
         $msg .= $this->formatTimestamp($r['added']) . ' ago.';
 
         $this->doPrivmsg($source, $prefix . $msg);
+    }
+
+    protected function registerAction( \Bot\Hostmask $hostmask, $channel, $action )
+    {
+        $params = array(
+            'nick' => $hostmask->getNick(),
+            'hostmask' => $hostmask->toString(),
+            'channel' => $channel,
+            'action' => $action,
+            'added' => time()
+        );
+
+        $db = Bot::getDatabase();
+        $r = $db->execute("INSERT INTO seen (nick, hostmask, channel, action, added) VALUES (:nick, :hostmask, :channel, :action, :added)", $params);
+        if (!$r)
+        {
+            echo "registerAction failed...\n";
+        }
     }
 
     public function formatTimestamp($timestamp)

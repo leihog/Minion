@@ -6,6 +6,11 @@ class Channel extends Plugin
 {
     protected $channels;
 
+    public function init()
+    {
+        /** @todo if we are being reloaded then find out what channels we are on. */
+    }
+
     public function on001( \Bot\Event\Irc $event )
     {
     	$channels = Bot::getConfig("plugins/channel/autojoin", array());
@@ -57,17 +62,22 @@ class Channel extends Plugin
 
     public function onNick( \Bot\Event\Irc $event )
     {
-        $nick = $event->getHostmask()->getNick();
+        $hostmask = $event->getHostmask();
+        $nick = $hostmask->getNick();
         $newNick = $event->getParam(0);
 
+        $channels = array();
         foreach( array_keys($this->channels) as $chan )
         {
             if ( isset($this->channels[$chan]['users'][$nick]) )
             {
+                $channels[] = $chan;
                 $this->channels[$chan]['users'][$newNick] = $this->channels[$chan]['users'][$nick];
                 unset($this->channels[$chan]['users'][$nick]);
             }
         }
+
+        Bot::getEventHandler()->raise( new \Bot\Event\Event('cnick', array($hostmask, $newNick, $channels)) );
     }
 
     public function onPart( \Bot\Event\Irc $event )
@@ -87,15 +97,20 @@ class Channel extends Plugin
 
     public function onQuit( \Bot\Event\Irc $event )
     {
-        $nick = $event->getHostmask()->getNick();
+        $hostmask = $event->getHostmask();
+        $nick = $hostmask->getNick();
 
+        $channels = array();
         foreach( array_keys($this->channels) as $chan )
         {
             if ( isset($this->channels[$chan]['users'][$nick]) )
             {
+                $channels[] = $chan;
                 unset($this->channels[$chan]['users'][$nick]);
             }
         }
+
+        Bot::getEventHandler()->raise( new \Bot\Event\Event('cquit', array($hostmask, $channels)) );
     }
 
 	/**
@@ -121,7 +136,7 @@ class Channel extends Plugin
             return;
         }
 
-        if ( $this->channels[$chan]['resync'] )
+        if ( isset($this->channels[$chan]['resync']) && $this->channels[$chan]['resync'] )
         {
             $this->doPrivmsg($nick, "Channel is resynchronizing, try again in a little while...");
             return;
@@ -155,6 +170,20 @@ class Channel extends Plugin
     		    $this->doPrivmsg($nick, $this->formatTableArray( $list, "%-10s", 4, 15 ));
         }
 
+    }
+
+    public function getChannels($nick)
+    {
+        $channels = array();
+        foreach( array_keys($this->channels) as $chan )
+        {
+            if ( isset($this->channels[$chan]['users'][$nick]) )
+            {
+                $channels[] = $chan;
+            }
+        }
+
+        return $channels;
     }
 
     public function isOn($nick, $channel)
