@@ -1,2 +1,4 @@
 todo.txt
 minion/*
+minion/
+.externalToolBuilders/

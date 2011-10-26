@@ -1,35 +1,48 @@
 <?php
 namespace Bot;
 
-abstract class Loader
+class Loader
 {
 	protected static $blueprints = array();
+
+	protected static $blueprintFileResolver;
+
+	public static function setFileResolver( $resolver )
+	{
+	    self::$blueprintFileResolver = $resolver;
+	}
 
 	/**
 	 * Returns Current version of class
 	 *
 	 * @param string $class
 	 */
-	public function getBlueprint( $class )
+	public static function getBlueprint( $class )
 	{
+	    if ( strpos($class, '\Bot\Plugin\\') === false ) /** @todo make this configurable */
+	    {
+	        return $class;
+	    }
+
 	    if ( isset(self::$blueprints[$class]) )
 	    {
 	        return self::$blueprints[$class]['current'];
 	    }
 
-	    return $this->loadClass( $class );
+	    return self::loadClass( $class );
 	}
 
-	/**
-	 * @param string $blueprint
-	 * @return string
-	 */
-	protected function getBlueprintFile( $blueprint )
-	{
-	    return strtolower( str_replace('\\', '/', ltrim($blueprint, '\\') ) ) . '.php';
-	}
+    protected static function getBlueprintFile( $class )
+    {
+        if ( !isset(self::$blueprintFileResolver) )
+        {
+            throw new \Exception('No Blueprint file resolver');
+        }
 
-	protected function getClass( $blueprint )
+        return self::$blueprintFileResolver->resolve($class);
+    }
+
+	protected static function getClass( $blueprint )
 	{
 	    return substr($blueprint, 0, strrpos($blueprint, '_'));
 	}
@@ -42,9 +55,9 @@ abstract class Loader
 	 * @param string $class
 	 * @param string $namespace
 	 */
-	protected function getNamespaced( $class, $namespace )
+	protected static function getNamespaced( $class, $namespace )
 	{
-	    if (strpos($class, '\\') === false)
+	    if (strpos($class, '\\') !== 0)
 	    {
 	        $class = $namespace . '\\' . $class;
 	    }
@@ -60,23 +73,23 @@ abstract class Loader
 	 * @param string $blueprint
 	 * @throws \Exception
 	 */
-	public function loadClass( $blueprint, $forceReload = false )
+	public static function loadClass( $blueprint, $forceReload = false )
 	{
 	    if ($blueprint[0] != '\\')
 	    {
 	        $blueprint = '\\' . $blueprint;
 	    }
 
-	    $blueprintFile = $this->getBlueprintFile($blueprint);
+	    $blueprintFile = self::getBlueprintFile($blueprint);
 	    $contents = file_get_contents( $blueprintFile );
 
 	    $fingerprint = sha1($contents);
 	    $blueprintClass = substr($blueprint, strrpos($blueprint, '\\')+1) . '_' . $fingerprint;
 	    $qualifiedClass = $blueprint . '_' . $fingerprint;
 
-	    if ( class_exists($qualifiedClass, false) )
+	    if ( class_exists($qualifiedClass, false) ) /** @todo handle differently, perhaps we remove force reload... */
 	    {
-	        if ( !$forceReload || !($parentClass = get_parent_class($qualifiedClass)) || !$this->loadClass( $this->getClass($parentClass), $forceReload ) )
+	        if ( !$forceReload || !($parentClass = get_parent_class($qualifiedClass)) || !self::loadClass( self::getClass($parentClass), $forceReload ) )
 	        {
 	            echo "class '{$qualifiedClass}' already loaded... \n"; /** @todo handle better */
 	            return false;
@@ -100,7 +113,7 @@ abstract class Loader
             }
             else
             {
-                if ($token[0] == T_CLASS || $token[0] == T_EXTENDS)
+                if ( $token[0] == T_CLASS )
                 {
                     $type = $token[0];
 
@@ -110,25 +123,42 @@ abstract class Loader
                         $token = next($tokens);
                     }
 
-                    if ($type == T_CLASS)
+                    $token[1] = $blueprintClass;
+                }
+                else if ($token[0] == T_EXTENDS)
+                {
+                    $className = '';
+                    $token = next($tokens);
+                    while ( ($token = next($tokens)) && $token[0] == T_STRING || $token[0] == T_NS_SEPARATOR)
                     {
-                        $token[1] = $blueprintClass;
+                        $className .= $token[1];
                     }
-                    else // Extends
-                    {
-                        $token[1] = $this->getBlueprint( $this->getNamespaced( $token[1], $defaultNamespace ) );
-                    }
+
+                    $className = self::getBlueprint( self::getNamespaced( $className, $defaultNamespace ) );
+                    $contents .= "extends {$className}";
                 }
                 else if ($token[0] == T_NAMESPACE)
                 {
                     $token = next($tokens);
-                    while( ($token = next($tokens)) && ($token[0] == 307 || $token[0] == 380) )
+                    while( ($token = next($tokens)) && ($token[0] == T_STRING || $token[0] == T_NS_SEPARATOR) )
                     {
                         $defaultNamespace .= $token[1];
                     }
 
                     $contents .= 'namespace '. $defaultNamespace;
                     $defaultNamespace = '\\' . $defaultNamespace;
+                }
+                else if ($token[0] == T_NEW)
+                {
+                    $className = '';
+                    $token = next($tokens);
+                    while ( ($token = next($tokens)) && $token[0] == T_STRING || $token[0] == T_NS_SEPARATOR)
+                    {
+                        $className .= $token[1];
+                    }
+
+                    $className = self::getBlueprint( self::getNamespaced( $className, $defaultNamespace ) );
+                    $contents .= "new {$className}";
                 }
                 else if ($token[0] == T_FILE)
                 {
@@ -143,19 +173,23 @@ abstract class Loader
             }
         }
 
-        eval($contents); /** @todo would be nice to use the stream include function instead. */
+
+        //echo $contents, "\n----\n";
+        error_log( "Parsing {$blueprintFile}..." ); /** @todo replace with proper logging */
+
+        eval($contents);
 
         if (!class_exists($qualifiedClass, false))
         {
             throw new \Exception("Failed to load {$qualifiedClass} using {$blueprint} from {$blueprintFile}.");
         }
 
-        $this->addBlueprint($blueprint, $qualifiedClass);
+        self::addBlueprint($blueprint, $qualifiedClass);
 
         return $qualifiedClass;
 	}
 
-	protected function addBlueprint($blueprint, $blueprintClass)
+	protected static function addBlueprint($blueprint, $blueprintClass)
 	{
 	    if ( isset(self::$blueprints[$blueprint]) )
 	    {
@@ -197,10 +231,27 @@ abstract class Loader
 	 *
 	 * @param string $class
 	 */
-	public function cloneObject( $class )
+	public static function createInstance()
 	{
-        $class = $this->getBlueprint( $class );
-	    return new $class();
+	    if ( !func_num_args() )
+	    {
+	        throw new Exception('createInstance called without a class name');
+	    }
+
+	    $args = func_get_args();
+        $class = array_shift($args);
+
+        // @todo class must be fully namespaced...
+
+        $class = self::getBlueprint( $class );
+
+        if ( empty($args) || !method_exists($class_name,  '__construct') )
+        {
+            return new $class();
+        }
+
+        $refClass = new ReflectionClass($class);
+        return $refClass->newInstanceArgs($args);
 	}
 
 }

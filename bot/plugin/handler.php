@@ -1,29 +1,14 @@
 <?php
 namespace Bot\Plugin;
 
-class Handler extends \Bot\Loader
+class Handler
 {
     protected $plugins = array();
-    protected $pluginPath;
 
     public function __construct( $path )
     {
-        $this->pluginPath = rtrim($path, '/') . '/';
-    }
-
-    /**
-     * @todo needs improvement
-     * @see Bot\Loader::getBlueprintFile()
-     */
-    public function getBlueprintFile( $blueprint )
-    {
-        $class = substr($blueprint, strrpos($blueprint, '\\')+1);
-        if ($class == 'Plugin' )
-        {
-            return __DIR__ . "/plugin.php";
-        }
-
-        return $this->pluginPath . $class . '.php';
+        $pluginFileResolver = new FileResolver( rtrim($path, '/') . '/' );
+        \Bot\Loader::setFileResolver($pluginFileResolver);
     }
 
     public function __call($name, $params)
@@ -58,7 +43,7 @@ class Handler extends \Bot\Loader
         {
             try
             {
-                $plugin = $this->cloneObject( '\Bot\Plugin\\' . $name );
+                $plugin = \Bot\Loader::createInstance( '\Bot\Plugin\\' . $name );
                 $this->plugins[ $name ] = $plugin;
 
                 if ( method_exists($plugin, 'init') )
@@ -67,6 +52,7 @@ class Handler extends \Bot\Loader
                 }
 
                 \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Plugin('loadplugin', array('plugin' => $plugin)) );
+                echo "Loaded plugin {$plugin->getName()}... \n";
                 return true;
             }
             catch( \Exception $e )
@@ -114,7 +100,7 @@ class Handler extends \Bot\Loader
     		return false;
     	}
 
-    	if ( $this->loadClass( '\Bot\Plugin\\' . $name, $force ) )
+    	if ( \Bot\Loader::loadClass( '\Bot\Plugin\\' . $name, $force ) )
     	{
 			$this->unloadPlugin($name);
 			$this->loadPlugin($name);
@@ -130,7 +116,8 @@ class Handler extends \Bot\Loader
     	if ($this->hasPlugin($name))
     	{
     	    \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Plugin('unloadplugin', array( 'plugin' => $this->plugins[$name] )) );
-    		unset( $this->plugins[$name] ); /** @todo maybe we should call an unload function on the plugin frist. */
+    	    unset( $this->plugins[$name] ); /** @todo maybe we should call an unload function on the plugin frist. */
+    	    echo "Unloaded plugin {$name}... \n";
     	}
     }
 }

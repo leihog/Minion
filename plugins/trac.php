@@ -1,6 +1,6 @@
 <?php
 namespace Bot\Plugin;
-use Bot\Bot;
+use Bot\Bot as Bot;
 
 class Trac extends Plugin
 {
@@ -23,7 +23,7 @@ class Trac extends Plugin
         {
             $tid = $match[1];
 
-            \Bot\Command::execute( $event, 'ticket', $tid );
+            Bot::getCommandDaemon()->execute( $event, 'ticket', $tid ); /** @todo add a method of adding new commands to the command queue of a user */
         }
 	}
 

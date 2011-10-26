@@ -7,7 +7,7 @@ class Debug extends Plugin
     /** @todo add  preUnload hook ( unload(), destroy() ) */
     public function init()
     {
-        Bot::getEventHandler()->addEventListener($this);
+        Bot::getEventHandler()->addListener($this);
     }
 
     public function __call($method, $args)

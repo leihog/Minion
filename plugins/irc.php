@@ -3,6 +3,11 @@ namespace Bot\Plugin;
 use Bot\Bot as Bot;
 use Bot\Command;
 
+/**
+ *
+ * This plugin is the bare minimum required for the bot to be able to connect to a server and join a channel.
+ *
+ */
 class Irc extends Plugin
 {
     protected $altnicks;
@@ -13,6 +18,12 @@ class Irc extends Plugin
         {
             reset($this->altnicks);
         }
+
+    	$channels = Bot::getConfig("plugins/channel/autojoin", array());
+    	if ( !empty($channels) )
+    	{
+			$this->doJoin($channels);
+		}
     }
 
     public function on433( \Bot\Event\Irc $event )
@@ -39,54 +50,7 @@ class Irc extends Plugin
         $irc = Bot::getConfig('irc');
 
         $this->doNick( $irc['nick'] );
-        $this->getServer()->send( $this->prepare('USER', $irc['username'], $host, $host, $irc['realname']) );
-    }
-
-    /**
-     * @todo this should probably be handled in \Bot\Server since it's so essential
-     * @param \Bot\Event\Irc $event
-     */
-    public function onPing( \Bot\Event\Irc $event )
-    {
-    	$args = $event->getParams();
-    	if (empty($args))
-    	{
-    		return;
-    	}
-
-		$this->getServer()->send( $this->prepare('PONG', $args[0]) );
-    }
-
-    public function onPrivmsg( \Bot\Event\Irc $event )
-    {
-        list($source, $input) = $event->getParams();
-        if ($event->isFromChannel() && $input[0] != '!')
-        {
-            return;
-        }
-
-        list($cmdName, $parameters) = array_pad( explode(' ', $input, 2), 2, null );
-        if ( $cmdName[0] == '!' )
-        {
-            $cmdName = substr($cmdName, 1);
-        }
-
-        if ( !Command::has($cmdName) )
-        {
-            if ( !$event->isFromChannel() )
-            {
-                $this->doPrivmsg($event->getSource(), 'What?');
-            }
-
-            return;
-        }
-
-        Command::execute( $event, $cmdName, $parameters );
-    }
-
-    public function cmdHello( \Bot\Event\Irc $event )
-    {
-        $this->doPrivmsg($event->getSource(), "Hello, how are you?");
+        $this->doUser( $irc['username'], $irc['realname'], $host );
     }
 
 }

@@ -1,12 +1,12 @@
 <?php
 namespace Bot\Plugin;
-use Bot\Bot;
+use Bot\Bot as Bot;
 
 class Acl extends Plugin
 {
     protected $accessControlList;
     protected $defaultCommandLevel;
-    protected $restrictCmds;
+    protected $restrictCmds; /** @todo try and remember what this is for? */
 
     public function init()
     {
@@ -22,14 +22,13 @@ class Acl extends Plugin
         }
 
         $this->loadAcl();
-        \Bot\Command::addAclHandler( $this );
+        Bot::getCommandDaemon()->addAclHandler( $this );
 
         echo "Acl loaded with ", count($this->accessControlList), " commands.\n";
     }
 
-    public function checkACL( $cmd )
+    public function checkACL( $cmdName, $event )
     {
-        $event = $cmd->getEvent();
         $hostmask = $event->getHostmask();
 
         $currentLevel = 0;
@@ -39,12 +38,12 @@ class Acl extends Plugin
             $currentLevel = $user->getLevel();
         }
 
-        if ( !isset($this->accessControlList[ $cmd->getName() ]) )
+        if ( !isset($this->accessControlList[ $cmdName ]) )
         {
             return true;
         }
 
-        if ( $this->accessControlList[ $cmd->getName() ] <= $currentLevel )
+        if ( $this->accessControlList[ $cmdName ] <= $currentLevel )
         {
             return true;
         }
@@ -52,6 +51,11 @@ class Acl extends Plugin
         return false;
     }
 
+    /**
+     * @todo this should be available even without the acl plugin.
+     *
+     * @param unknown_type $event
+     */
 	public function cmdCmds( \Bot\Event\Irc $event )
 	{
         $hostmask = $event->getHostmask();
@@ -63,9 +67,9 @@ class Acl extends Plugin
 	        return;
 	    }
 
-	    $user = \Bot\User::getIdentifiedUser($hostmask);
+	    $user = \Bot\User::getIdentifiedUser($hostmask); /** @todo make a method that only returns user level */
 	    $level = ( $user ? $user->getLevel() : 0);
-		$cmds = \Bot\Command::getCommands();
+		$cmds = Bot::getCommandDaemon()->getCommands();
 
 		$userCmds = array();
 		foreach( $cmds as &$cmd )

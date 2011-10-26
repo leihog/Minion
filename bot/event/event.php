@@ -1,7 +1,7 @@
 <?php
 namespace Bot\Event;
 
-class Event
+abstract class Event
 {
 	protected $name;
 	protected $params;
@@ -43,7 +43,7 @@ class Event
 
 	    return $default;
 	}
-	
+
 	public function getParams()
 	{
 		return $this->params;

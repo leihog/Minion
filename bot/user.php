@@ -8,7 +8,7 @@ class User
     protected $hostmasks = array();
     protected $id;
     protected $level;
-    protected $username;    
+    protected $username;
 
     protected $authenticated = false;
 
@@ -45,7 +45,7 @@ class User
     {
         return $this->level;
     }
-    
+
     public function getName()
     {
     	return $this->username;
@@ -53,9 +53,9 @@ class User
 
     public function getNick()
     {
-        return $this->username; //TODO FIX THIS
+        return $this->username; /** @todo FIX THIS */
     }
-    
+
     public function getHostmasks()
     {
     	return $this->hostmasks;
@@ -70,7 +70,7 @@ class User
 
         return false;
     }
-    
+
     public function isAuthenticated()
     {
         return $this->authenticated;
@@ -81,7 +81,7 @@ class User
     public static function authenticate( $username, $password, \Bot\Hostmask $hostmask )
     {
         $db = Bot::getDatabase();
-        
+
         $credentials = $db->fetch('SELECT password, salt FROM users WHERE username = :username', compact('username'));
         if ( $credentials && self::hashPassword( $password, $credentials['salt'] ) == $credentials['password'] )
         {
@@ -97,7 +97,7 @@ class User
         $db = Bot::getDatabase();
         return $db->fetchScalar( 'SELECT count(*) FROM users' );
     }
-    
+
     public static function create( \Bot\Hostmask $hostmask, $password )
     {
         $username = $hostmask->getNick();
@@ -112,7 +112,7 @@ class User
     	{
     	    $user = self::fetch( $username );
     	    $user->addHostmask( $hostmask );
-    	    
+
     	    self::$_identifiedUsers[$hostmask->toString()] = $user;
     	    return $db->lastInsertId();
     	}
@@ -123,7 +123,7 @@ class User
     public static function fetch( $username )
     {
         $db = Bot::getDatabase();
-        
+
         $user = $db->fetch( 'SELECT * FROM users WHERE username = :username', compact('username') );
         if ($user)
     	{
@@ -140,19 +140,18 @@ class User
     {
         $db = Bot::getDatabase();
         $users = $db->fetchAll('SELECT * FROM users');
-        
+
         foreach($users as &$user)
         {
             $user = new self($user);
         }
 
-        return $users; 
+        return $users;
     }
 
     /**
-     * @todo remove this as its probably not in use...
      *
-     * @param unknown_type $hostmask
+     * @param \Bot\Hostmask $hostmask
      */
     public static function getIdentifiedUser( \Bot\Hostmask $hostmask )
     {
@@ -184,12 +183,12 @@ class User
     {
         $db = Bot::getDatabase();
         $userId = $db->fetchScalar('SELECT id FROM users WHERE username = :username', compact($username));
-        
+
         if ( $userId )
         {
             return true;
         }
-        
+
         return false;
-    } 
+    }
 }

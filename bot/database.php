@@ -1,6 +1,8 @@
 <?php
 namespace Bot;
-
+/**
+ * @todo not happy with the database class. Think it over.
+ */
 class Database
 {
     protected $db;

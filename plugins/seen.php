@@ -29,11 +29,16 @@ class Seen extends Plugin
         }
     }
 
-    public function onCNick( \Bot\Event\Event $event )
+    public function onKick( \Bot\Event\Event $event )
     {
-        $hostmask = $event->getParam(0);
-        $newNick = $event->getParam(1);
-        $channels = $event->getParam(2);
+
+    }
+
+    public function onNick( \Bot\Event\Irc $event )
+    {
+        $hostmask = $event->getHostmask();
+        $newNick = $event->getParam(1); /** @todo make sure that this is still correct */
+        $channels = $event->getChannels();
 
         $newHostmask = new \Bot\Hostmask("{$newNick}!{$hostmask->getUsername()}@{$hostmask->getHost()}");
 
@@ -53,10 +58,10 @@ class Seen extends Plugin
         }
     }
 
-    public function onCQuit( \Bot\Event\Event $event )
+    public function onQuit( \Bot\Event\Irc $event )
     {
-        $hostmask = $event->getParam(0);
-        $channels = $event->getParam(1);
+        $hostmask = $event->getHostmask();
+        $channels = $event->getChannels();
 
         if ( $hostmask->getNick() != $this->getNick() )
         {

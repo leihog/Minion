@@ -12,13 +12,15 @@ class Bot
 
     protected $config;
     protected $database;
-    protected $pluginHandler;
-
     protected $engineOn;
+    protected $serverConnection = null;
+
+    // Daemons
     protected $eventHandler;
     protected $socketHandler;
-
-    protected $serverConnection = null;
+    protected $channelDaemon;
+    protected $commandDaemon;
+    protected $pluginHandler;
 
 	public function __construct()
 	{
@@ -61,19 +63,15 @@ class Bot
      */
     public function autoLoadClass( $class )
     {
-    	try
-    	{
-    		$classFile = strtolower( str_replace('\\', '/', $class ) ) . '.php';
-    		@include_once( $classFile );
+		$classFile = strtolower( str_replace('\\', '/', $class ) ) . '.php';
+		if ( file_exists( $classFile ) )
+		{
+    		include_once( $classFile );
     		if ( class_exists($class, false) || interface_exists($class, false) )
     		{
     			return true;
     		}
-    	}
-    	catch( \Exception $e )
-    	{
-    		echo $e->getMessage(), "\n";
-    	}
+		}
 
     	echo '(ERROR) Failed to load ', $class, ' from file ', $classFile, "\n";
     	return false;
@@ -90,7 +88,6 @@ class Bot
     }
 
     /**
-     *
      * @return \Bot\Database
      */
     public static function getDatabase()
@@ -116,12 +113,43 @@ class Bot
         return $obj->workingDirectory;
     }
 
+    // Daemons
+
+    public static function getChannelDaemon()
+    {
+        return self::getInstance()->channelDaemon;
+    }
+
+    public static function getCommandDaemon()
+    {
+        return self::getInstance()->commandDaemon;
+    }
+
     /**
      * @return \Bot\Event\Handler
      */
 	public static function getEventHandler()
 	{
 		return self::getInstance()->eventHandler;
+	}
+
+	/**
+	 * Returns the plugin handler
+	 * @return \Bot\Plugin\Handler
+	 */
+	public static function getPluginHandler()
+	{
+		return self::getInstance()->pluginHandler;
+	}
+
+	/**
+	 * @todo Does this really need to be public static
+	 * return the socketHandler
+	 * @return Bot\Socket\Handler
+	 */
+	public static function getSocketHandler()
+	{
+		return self::getInstance()->socketHandler;
 	}
 
 	/**
@@ -136,35 +164,17 @@ class Bot
 		}
 	}
 
-	/**
-	 * Returns the plugin handler
-	 * @return \Bot\Plugin\Handler
-	 */
-	public static function getPluginHandler()
+	public static function getServer()
 	{
-		return self::getInstance()->pluginHandler;
-	}
-
-	public function getServer()
-	{
-	    if ( !$this->serverConnection )
+	    if ( !self::getInstance()->serverConnection )
 	    {
 	        return false;
 	    }
 
-	    return $this->serverConnection;
+	    return self::getInstance()->serverConnection;
 	}
 
-	/**
-	 * return the socketHandler
-	 * @return Bot\Socket\Handler
-	 */
-	public static function getSocketHandler()
-	{
-		return self::getInstance()->socketHandler;
-	}
-
-    public function init()
+    protected function init()
     {
     	try
     	{
@@ -179,10 +189,13 @@ class Bot
     		$this->eventHandler = new Event\Handler();
     		$this->socketHandler = new Socket\Handler();
     		$this->pluginHandler = new Plugin\Handler( $this->pluginDirectory );
+            $this->commandDaemon = new Daemon\Command();
+            $this->channelDaemon = new Daemon\Channel();
 
+    		$this->eventHandler->addEventListener( $this ); // Bot is always first in stack
+            $this->eventHandler->addEventListener( $this->commandDaemon ); // command handler must come before any plugins.
+            $this->eventHandler->addEventListener( $this->channelDaemon );
     		$this->eventHandler->addEventListener( $this->pluginHandler );
-    		$this->eventHandler->addEventListener( $this );
-
 
     		$plugins = $this->config->get('autoload');
     		foreach($plugins as $plugin)
@@ -281,13 +294,12 @@ class Bot
 
     /**
      * Shutsdown the bot
+     *
+     * @todo disconnect all sockets...
+     * @todo save everything that needs to be saved...
      */
     public function shutdown($msg = '')
     {
-    	// todo:
-    	// disconnect all sockets...
-    	// save everything that needs to be saved...
-
     	echo $msg, "Shutting down.\n";
         $this->engineOn = false;
     }
@@ -299,23 +311,6 @@ class Bot
         {
             $this->serverConnection = null;
         }
-    }
-
-    public function onLoadPlugin( \Bot\Event\Plugin $event )
-    {
-        $plugin = $event->getPlugin();
-        Command::extractCommandPointers($plugin);
-
-        echo "Loaded plugin {$plugin->getName()}... \n";
-    }
-
-    public function onUnloadPlugin( \Bot\Event\Plugin $event )
-    {
-        $plugin = $event->getPlugin();
-        Command::removeCommandPointers($plugin);
-        Command::removeAclHandler($plugin);
-
-        echo "Unloaded plugin {$plugin->getName()}... \n";
     }
 
 }
