@@ -1,3 +1,4 @@
+##Minion
 Minion is an IRC bot written in PHP.
 
 Requirements:
@@ -10,3 +11,6 @@ Features:
 
 Out of the box Minion has almost no features.
 Instead Minion has support for adding more functions and commands through plugins.
+
+##Flattr this project
+[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=leihog&url=https://github.com/leihog/Minion&title=Minion&language=en_GB&tags=github&category=software)
