@@ -1,123 +1,131 @@
 <?php
 namespace Bot\Plugin;
+use Bot\Event\Dispatcher as Event;
+use Bot\Bot as Bot;
 
 class Handler
 {
-    protected $plugins = array();
+	protected $plugins = array();
+	protected $loader;
 
-    public function __construct( $path )
-    {
-        $pluginFileResolver = new FileResolver( rtrim($path, '/') . '/' );
-        \Bot\Loader::setFileResolver($pluginFileResolver);
-    }
+	public function __construct( $path )
+	{
+		$loader = new Loader();
+		$loader->setFileResolver(new FileResolver( rtrim($path, '/') . '/' ));
+		$this->loader = $loader;
+	}
 
-    public function __call($name, $params)
-    {
-    	if ( strpos($name, 'on') === 0 )
-    	{
-    	    $obj = new \ArrayObject($this->plugins);
-    	    $iterator = $obj->getIterator();
-    		while ( $iterator->valid() )
-    		{
-    			$plugin = $iterator->current();
-    			if (method_exists($plugin, $name))
-    			{
-    			    try
-    			    {
-    			        call_user_func_array(array($plugin, $name), $params);
-    			    }
-    				catch( \Exception $e )
-    				{
-    				    echo $e->getMessage(), "\n";
-    				}
-    			}
-
+	public function __call($name, $params)
+	{
+		if ( strpos($name, 'on') === 0 )
+		{
+			$obj = new \ArrayObject($this->plugins);
+			$iterator = $obj->getIterator();
+			while ( $iterator->valid() )
+			{
+				$plugin = $iterator->current();
+				if (method_exists($plugin, $name))
+				{
+					try
+					{
+						call_user_func_array(array($plugin, $name), $params);
+					}
+					catch( \Exception $e )
+					{
+						Bot::log($e->getMessage());
+					}
+				}
 				$iterator->next();
-    		}
-    	}
-    }
+			}
+		}
+	}
 
-    public function loadPlugin( $name )
-    {
-        if ( !$this->hasPlugin($name) )
-        {
-            try
-            {
-                $plugin = \Bot\Loader::createInstance( '\Bot\Plugin\\' . $name );
-                $this->plugins[ $name ] = $plugin;
+	/**
+	 * @todo make sure plugin extends \Bot\Plugin\Plugin
+	 */
+	public function loadPlugin( $name )
+	{
+		if ( !$this->hasPlugin($name) ) {
+			try
+			{
+				$plugin = $this->loader->createInstance( '\Bot\Plugin\\' . $name );
+				$this->plugins[ $name ] = $plugin;
+				$plugin->init();
+				Bot::log("Loaded plugin {$plugin->getName()}...");
+				
+				Event::dispatch(
+					new \Bot\Event\Plugin('loadplugin', array('plugin' => $name))
+				);
+				return true;
+			}
+			catch( \Exception $e )
+			{
+				Bot::log("Failed to load plugin '{$name}', Reason: {$e->getMessage()}.");
+			}
+		}
 
-                if ( method_exists($plugin, 'init') )
-                {
-                    $plugin->init();
-                }
+		return false;
+	}
 
-                \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Plugin('loadplugin', array('plugin' => $plugin)) );
-                echo "Loaded plugin {$plugin->getName()}... \n";
-                return true;
-            }
-            catch( \Exception $e )
-            {
-                echo "Failed to load plugin '{$name}', Reason: {$e->getMessage()}. \n";
-            }
-        }
+	public function getPlugin( $name )
+	{
+		if ( isset($this->plugins[$name]) )
+		{
+			return $this->plugins[$name];
+		}
 
-        return false;
-    }
+		return false;
+	}
 
-    public function getPlugin( $name )
-    {
-        if ( isset($this->plugins[$name]) )
-        {
-            return $this->plugins[$name];
-        }
+	/**
+	 * Returns a list of the loaded plugins
+	 * @return array
+	 */
+	public function getPlugins()
+	{
+		return array_keys($this->plugins);
+	}
 
-        return false;
-    }
+	public function hasPlugin( $name )
+	{
+		if ( !isset($this->plugins[$name]) )
+		{
+			return false;
+		}
 
-    /**
-     * Returns a list of the loaded plugins
-     * @return array
-     */
-    public function getPlugins()
-    {
-        return array_keys($this->plugins);
-    }
+		return true;
+	}
 
-    public function hasPlugin( $name )
-    {
-        if ( !isset($this->plugins[$name]) )
-        {
-            return false;
-        }
+	public function reloadPlugin( $name, $force = false )
+	{
+		if ( !$this->hasPlugin( $name ) )
+		{
+			return false;
+		}
 
-        return true;
-    }
-
-    public function reloadPlugin( $name, $force = false )
-    {
-    	if ( !$this->hasPlugin( $name ) )
-    	{
-    		return false;
-    	}
-
-    	if ( \Bot\Loader::loadClass( '\Bot\Plugin\\' . $name, $force ) )
-    	{
+		if ( $this->loader->loadClass( '\Bot\Plugin\\' . $name ) )
+		{
 			$this->unloadPlugin($name);
 			$this->loadPlugin($name);
-
 			return true;
-    	}
+		}
+		return false;
+	}
 
-    	return false;
-    }
+	public function unloadPlugin( $name )
+	{
+		if ($this->hasPlugin($name))
+		{
+			$plugin = $this->plugins[$name];
 
-    public function unloadPlugin( $name )
-    {
-    	if ($this->hasPlugin($name))
-    	{
-    	    \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Plugin('unloadplugin', array( 'plugin' => $this->plugins[$name] )) );
-    	    unset( $this->plugins[$name] ); /** @todo maybe we should call an unload function on the plugin frist. */
-    	    echo "Unloaded plugin {$name}... \n";
-    	}
-    }
+			Event::dispatch(
+				new \Bot\Event\Plugin('unloadplugin', array('plugin' => $name))
+			);
+
+			$plugin->unload();
+			unset( $this->plugins[$name] );
+			$plugin = null;
+			Bot::log("Unloaded plugin {$name}...");
+		}
+	}
 }

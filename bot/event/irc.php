@@ -1,11 +1,12 @@
 <?php
 namespace Bot\Event;
 
-class Irc extends Socket
+class Irc extends Event
 {
 	protected $hostmask = false;
 	protected $raw = false;
 	protected $channels = array();
+	protected $server = null;
 
 	/**
 	 *
@@ -42,24 +43,14 @@ class Irc extends Socket
         return false;
     }
 
-    public function getSource()
-    {
-        if ($this->isFromChannel())
-        {
-            return $this->params[0];
-        }
-
-        return $this->hostmask->getNick();
-    }
-
-	/**
-	 * Returns the server socket
-	 * s
-	 * @return Bot\Connection\Server
-	 */
-	public function getConnection()
+	public function getSource()
 	{
-		return $this->getSocket();
+		if ($this->isFromChannel())
+		{
+			return $this->params[0];
+		}
+
+		return $this->hostmask->getNick();
 	}
 
 	public function getChannels()
@@ -70,5 +61,14 @@ class Irc extends Socket
 	public function setChannels( $channels )
 	{
 	    $this->channels = $channels;
+	}
+	public function getServer()
+	{
+		return $this->server;
+	}
+
+	public function setServer( $server )
+	{
+		$this->server = $server;
 	}
 }

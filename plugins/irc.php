@@ -1,7 +1,6 @@
 <?php
 namespace Bot\Plugin;
-use Bot\Bot as Bot;
-use Bot\Command;
+use Bot\Config as Config;
 
 /**
  *
@@ -10,47 +9,46 @@ use Bot\Command;
  */
 class Irc extends Plugin
 {
-    protected $altnicks;
+	protected $altnicks;
 
-    public function on001( \Bot\Event\Irc $event )
-    {
-        if (!empty($this->altnicks))
-        {
-            reset($this->altnicks);
-        }
-
-    	$channels = Bot::getConfig("plugins/channel/autojoin", array());
-    	if ( !empty($channels) )
-    	{
-			$this->doJoin($channels);
+	public function on001( \Bot\Event\Irc $event )
+	{
+		if (!empty($this->altnicks))
+		{
+			reset($this->altnicks);
 		}
-    }
 
-    public function on433( \Bot\Event\Irc $event )
-    {
-        list($nick, $desc) = explode(' :', $event->getParam(0), 2);
+		$channels = Config::get("plugins/channel/autojoin", array());
+		if ( !empty($channels) )
+		{
+			$event->getServer()->doJoin($channels);
+		}
+	}
 
-        $this->altnicks = Bot::getConfig('plugins/irc/altnicks', false);
-        if ( !$this->altnicks || !current($this->altnicks) )
-        {
-            $newnick = $nick . date('s');
-        }
-        else
-        {
-            $newnick = current($this->altnicks);
-            next($this->altnicks);
-        }
+	public function on433( \Bot\Event\Irc $event )
+	{
+		list($nick, $desc) = explode(' :', $event->getParam(0), 2);
 
-        $this->doNick( $newnick );
-    }
+		if ( !isset($this->altnicks) ) {
+			$this->altnicks = Config::get('plugins/irc/altnicks', false);
+		}
 
-    public function onConnect( \Bot\Event\Socket $event )
-    {
-        $host = $event->getHost();
-        $irc = Bot::getConfig('irc');
+		if ( !$this->altnicks || current($this->altnicks) === false ) {
+			$newnick = $nick . date('s');
+		} else {
+			$newnick = current($this->altnicks);
+			next($this->altnicks);
+		}
 
-        $this->doNick( $irc['nick'] );
-        $this->doUser( $irc['username'], $irc['realname'], $host );
-    }
+		$event->getServer()->doNick( $newnick );
+	}
 
+	public function onConnect( \Bot\Event\Irc $event )
+	{
+		$server = $event->getServer();
+		$irc = Config::get('irc');
+
+		$server->doNick( $irc['nick'] );
+		$server->doUser( $irc['username'], $irc['realname'], $server->getHost() );
+	}
 }

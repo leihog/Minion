@@ -1,4 +1,4 @@
-todo.txt
-minion/*
-minion/
-.externalToolBuilders/
+todo
+examplebot/data/*
+examplebot/logs/*
+examplebot/config.php

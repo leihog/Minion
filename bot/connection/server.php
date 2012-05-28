@@ -1,13 +1,19 @@
 <?php
 namespace Bot\Connection;
+use Bot\Event\Dispatcher as Event;
 
-class Server extends \Bot\Socket\Client\Stream
+class Server implements IConnection
 {
+	protected $host;
+	protected $port;
+	protected $transport;
+
 	protected $nick;
 	protected $realname;
 	protected $username;
 
-	protected $buffer = ''; // used when reading input
+	// used for I/O
+	protected $buffer = '';
 	protected $writeQueue = array();
 
 	// anti send-flood
@@ -16,14 +22,128 @@ class Server extends \Bot\Socket\Client\Stream
 	protected $lastChecked;
 	protected $allowance;
 
-	public function connect()
-	{
-		if (parent::connect())
-		{
-		    $this->lastChecked = time();
-		    $this->allowance = $this->rate;
+	protected $channels;
 
-            \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Connect', array( 'socket' => $this ) ));
+	public function __construct( $options, $adapter )
+	{
+		foreach( $options as $key => $value )
+		{
+			$method = "set{$key}";
+			if (method_exists($this, $method))
+			{
+				$this->$method($value);
+			}
+		}
+
+		$this->adapter = $adapter;
+		$this->channels = new \Bot\Channels();
+	}
+
+	protected function handleInput( $line )
+	{
+		if (empty($line)) {
+			return;
+		}
+
+		$cmd = $args = $raw = $hostmask = null;
+		extract( \Bot\Parser\Irc::parse( $line ), EXTR_IF_EXISTS);
+
+		if ( $cmd == 'ping' ) {
+			$this->send( $this->prepare('PONG', $args[0]) );
+		}
+
+		$event = new \Bot\Event\Irc($cmd, $args);
+		$event->setRaw($raw);
+		$event->setServer($this);
+		if ( !is_numeric($cmd) && strpos($hostmask, '@') ) {
+			$event->setHostmask( new \Bot\Hostmask( $hostmask ) );
+		}
+
+		$method = "on{$cmd}";
+		if ( method_exists($this->channels, $method) ) {
+			$this->channels->$method( $event );
+		}
+
+		Event::dispatch( $event );
+	}
+
+	/**
+	 * Builds a server command with parameters from the argument list
+	 *
+	 * @todo perhaps we should abandon this.
+	 *
+	 * @param string $cmd
+	 * @param string $arg1, $arg2, $arg3
+	 * @throws \Exception
+	 */
+	protected function prepare()
+	{
+		$args = func_get_args();
+		if ( empty($args) )
+		{
+			throw new \Exception('Prepare() called with no parameters...');
+		}
+
+		$buffer = array_shift($args);
+		if ( !empty($args) )
+		{
+			if ( count($args) == 1 && is_array($args[0]) )
+			{
+				$args = $args[0];
+				$args[] = ':'. array_pop($args);
+			}
+
+			$buffer .= ' ' . preg_replace('/\v+/', ' ', implode(' ', $args));
+		}
+
+		return trim($buffer);
+	}
+
+	/**
+	 * Adds $string to the send queue
+	 * If $skipQueue is true then $string is sent right away.
+	 *
+	 * @param string $string
+	 * @param boolean $skipQueue
+	 */
+	protected function send( $string, $skipQueue = false )
+	{
+	    $string .= "\r\n";
+		if ( $skipQueue )
+		{
+			try
+			{
+				$this->adapter->write($string);
+			}
+			catch( \Exception $e )
+			{
+				Bot::log("Failed to write\n". $e->getMessage());
+			}
+			return;
+		}
+
+		$this->writeQueue[] = $string;
+	}
+
+	// IConnection methods
+	public function connect( $uri )
+	{
+		@list($transport, $host, $port) = preg_split('@\://|\:@', $uri);
+
+		if ($this->adapter->connect($transport, $host, $port))
+		{
+			// This should probably be stored in the adapter
+			$this->transport = $transport;
+			$this->host = $host;
+			$this->port = $port;
+
+			// initializing anti-client-flood
+			$this->lastChecked = time();
+			$this->allowance = $this->rate;
+
+			Event::dispatch(
+				new \Bot\Event\Irc( 'Connect', array( 'server' => $this ) )
+			);
 
 			return true;
 		}
@@ -33,160 +153,49 @@ class Server extends \Bot\Socket\Client\Stream
 
 	public function disconnect()
 	{
-	    parent::disconnect();
-	    \Bot\Bot::getEventHandler()->raise( new \Bot\Event\Socket( 'Disconnect', array('socket' => $this) ));
+		if ( $this->adapter->isConnected() )
+		{
+			// @todo Make sure that we finish writing the queue.. or is that not important?
+			$this->adapter->disconnect();
+		}
+
+		Event::dispatch(
+			new \Bot\Event\Irc( 'Disconnect', array('server' => $this) )
+		);
 	}
 
-	// input
-
-	protected function parseArguments($args, $count = -1)
-    {
-        return preg_split('/ :?/S', $args, $count);
-    }
-
-    protected function parseLine( $line )
-    {
-    	if (empty($line))
-    	{
-    		return;
-    	}
-
-    	$raw = $line;
-
-    	$hostmask = '';
-    	if ( $line[0] == ':' )
-    	{
-    		list($hostmask, $line) = explode(' ', $line, 2);
-    		$hostmask = substr($hostmask, 1);
-    	}
-
-		list($cmd, $args) = array_pad(explode(' ', $line, 2), 2, null); // not sure the array_pad is needed.
-		$cmd = strtolower($cmd);
-
-		switch( $cmd )
-		{
-	        case 'error':
-		    case 'join':
-            case 'names':
-	        case 'nick':
-            case 'part':
-	        case 'ping':
-	        case 'pong':
-	        case 'quit':
-	            $args = array_filter(array(ltrim($args, ':')));
-	            break;
-
-	        case 'privmsg':
-	        case 'notice':
-	            $this->parseMsg( $cmd, $args );
-	        	break;
-
-	        case 'topic':
-	        case 'invite':
-	            $args = $this->parseArguments($args, 2);
-	            break;
-
-	        case 'kick':
-	        case 'mode':
-	            $args = $this->parseArguments($args, 3);
-	            break;
-
-	        default: // Numeric response
-	            if ( $args[0] == '*')
-	            {
-	                $args = substr($args, 2);
-	            }
-	            else
-	            {
-	                $args = array( ltrim( substr($args, strpos($args, ' ')), ' :=') );
-	            }
-
-	            break;
-		} //end switch
-
-		if ( $cmd == 'ping' )    // Handle server ping
-		{
-		    $this->send( $this->prepare('PONG', $args[0]) );
-		}
-
-		$event = new \Bot\Event\Irc($cmd, $args);
-		$event->setRaw($raw);
-		$event->setSocket($this);
-
-		if ( !is_numeric($cmd) && strpos($hostmask, '@') )
-		{
-			$event->setHostmask( new \Bot\Hostmask( $hostmask ) );
-		}
-
-		\Bot\Bot::getEventHandler()->raise( $event );
-    }
-
-	protected function parseMsg( &$cmd, &$args )
+	public function getResource()
 	{
-		$args = $this->parseArguments($args, 2);
-
-		list($source, $ctcp) = $args;
-		if (substr($ctcp, 0, 1) === "\001" && substr($ctcp, -1) === "\001")
-		{
-			$ctcp = substr($ctcp, 1, -1);
-			$reply = ($cmd == 'notice');
-			list($cmd, $args) = array_pad(explode(' ', $ctcp, 2), 2, array());
-			$cmd = strtolower($cmd);
-
-			switch ($cmd)
-			{
-				case 'action':
-					$args = array($source, $args);
-					break;
-
-				case 'finger':
-				case 'ping':
-				case 'time':
-				case 'version':
-					if ($reply)
-					{
-						$args = array($args);
-					}
-					break;
-			}
-		}
+		return $this->adapter->getResource();
 	}
 
 	/**
-	 * Handles socket input and raises events.
-	 *
-	 * @see Bot\Socket\Client.Stream::read()
+	 * reads from the adapter.
 	 */
-	public function read()
+	public function onCanRead()
 	{
-		$buffer = $this->buffer . parent::read(512);
+		$buffer = $this->buffer . $this->adapter->read(512);
 		$this->buffer = '';
-		if (empty($buffer))
-		{
+		if (empty($buffer)) {
 			return;
 		}
 
 		$incompleteRead = false;
-		if ( !preg_match('/\v+$/', $buffer) )
-		{
+		if ( !preg_match('/\v+$/', $buffer) ) {
 			$incompleteRead = true;
 		}
 
 		$buffer = preg_split('/\v+/', $buffer);
-		if ( $incompleteRead )
-		{
+		if ( $incompleteRead ) {
 			$this->buffer = array_pop($buffer);
 		}
 
-		foreach($buffer as &$line)
-		{
-			$this->parseLine(trim($line));
+		foreach($buffer as &$line) {
+			$this->handleInput( trim($line) );
 		}
 	}
 
-	// output
-
-	public function processWriteQueue()
+	public function onCanWrite()
 	{
 		if (empty($this->writeQueue))
 		{
@@ -207,48 +216,28 @@ class Server extends \Bot\Socket\Client\Stream
 		{
 			try
 			{
-			    --$this->allowance;
-				$this->write( $buffer );
+				--$this->allowance;
+				$this->adapter->write( $buffer );
 			}
 			catch(\Exception $e)
 			{
-				echo "Failed to write\n", $e->getMessage(), "\n";
+				Bot::log("Failed to write\n". $e->getMessage());
 				break;
 			}
 		}
 	}
 
-	/**
-	 * Adds $string to the send queue
-	 * If $skipQueue is true then $string is sent right away.
-	 *
-	 * @param string $string
-	 * @param boolean $skipQueue
-	 *
-	 * @see Bot\Socket\Client.Stream::write()
-	 */
-	public function send( $string, $skipQueue = false )
-	{
-	    $string .= "\r\n";
-        if ( $skipQueue )
-        {
-            try
-            {
-                $this->write($string);
-            }
-            catch( \Exception $e )
-            {
-                echo "Failed to write\n", $e->getMessage(), "\n";
-            }
-
-            return;
-        }
-
-		$this->writeQueue[] = $string;
-	}
 
 	// getters / setters
+	public function getHost()
+	{
+		return $this->host;
+	}
 
+	public function getPort()
+	{
+		return $this->port;
+	}
 	public function getNick()
 	{
 	    return $this->nick;
@@ -269,40 +258,12 @@ class Server extends \Bot\Socket\Client\Stream
 		$this->username = $username;
 	}
 
-	// server commands
 
-	/**
-	 * Builds a server command with parameters from the argument list
-	 *
-	 * @todo perhaps we should abandon this.
-	 *
-	 * @param string $cmd
-	 * @param string $arg1, $arg2, $arg3
-	 * @throws \Exception
-	 */
-	protected function prepare()
+	// IRC commands
+	public function doEmote( $target, $msg )
 	{
-		$args = func_get_args();
-		if ( empty($args) )
-		{
-			throw new \Exception('Prepare() called with no parameters...');
-		}
-
-		$buffer = array_shift($args);
-        if ( !empty($args) )
-        {
-        	if ( count($args) == 1 && is_array($args[0]) )
-        	{
-        		$args = $args[0];
-        		$args[] = ':'. array_pop($args);
-        	}
-
-            $buffer .= ' ' . preg_replace('/\v+/', ' ', implode(' ', $args));
-        }
-
-	    return trim($buffer);// . "\r\n";
+		$this->doPrivmsg($target, "\001ACTION {$msg}");
 	}
-
 	public function doJoin( $channel, $key = '' )
 	{
 		if ( is_array($channel) )
@@ -351,15 +312,13 @@ class Server extends \Bot\Socket\Client\Stream
 	 */
 	public function doPrivmsg( $target, $msg )
 	{
-	    if ( !is_array($msg) )
-	    {
-	        $msg = array($msg);
-	    }
+		if ( !is_array($msg) ) {
+			$msg = array($msg);
+		}
 
-	    foreach( $msg as &$str )
-	    {
-	        $this->send( $this->prepare('PRIVMSG', array($target, $str)) );
-	    }
+		foreach( $msg as &$str ) {
+			$this->send( $this->prepare('PRIVMSG', array($target, $str)) );
+		}
 	}
 
 	public function doTopic( $channel, $topic = false )
@@ -382,6 +341,5 @@ class Server extends \Bot\Socket\Client\Stream
 	{
 	    $this->send( $msg );
 	}
-
 
 }

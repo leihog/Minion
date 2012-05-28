@@ -1,24 +1,25 @@
 <?php
 namespace Bot\Plugin;
+use \Bot\Bot as Bot;
 
 class FileResolver
-{
-    protected $pluginPath;
+	{
+	protected $pluginPath;
 
-    public function __construct( $path )
-    {
-        $this->pluginPath = $path;
-    }
+	public function __construct( $path )
+	{
+		$this->pluginPath = $path;
+	}
 
-    public function resolve( $class )
-    {
-        $class = str_replace(array('\Bot\Plugin\\', '\\'), array('', '/'), $class);
-        echo "loading: $class from {$this->pluginPath} \n";
-        if ($class == 'Plugin' )
-        {
-            return 'bot/plugin/plugin.php';
-        }
+	public function resolve( $class )
+	{
+		$class = str_replace(array('\Bot\Plugin\\', '\\'), array('', '/'), $class);
+		Bot::log("loading: $class from {$this->pluginPath}");
+		if ($class == 'Plugin' )
+		{
+			return 'bot/plugin/plugin.php';
+		}
 
-        return $this->pluginPath . strtolower($class) . '.php';
-    }
+		return $this->pluginPath . strtolower($class) . '.php';
+	}
 }

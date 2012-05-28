@@ -23,31 +23,40 @@ class Database
         $this->initialize();
     }
 
-    public function execute( $query, $params = array() )
-    {
-    	try
-    	{
-    		$q = $this->db->prepare($query);
-    		$q->execute($params);
-    		if ($q->errorCode() == '00000')
-    		{
-    		    return true;
-    		}
-    	}
-    	catch( \PDOException $e )
-    	{
-    	    /** @todo log or report errors... */
-    	}
+	public function execute( $query, $params = array() )
+	{
+		try
+		{
+			$q = $this->db->prepare($query);
+			if (!$q) {
+				Bot::log('Bad query: '. $query);
+				return false;
+			}
 
-    	return false;
-    }
+			$q->execute($params);
+			if ($q->errorCode() == '00000') {
+				return true;
+			}
+		}
+		catch( \PDOException $e )
+		{
+			Bot::log($e->getMessage());
+			/** @todo log or report errors... */
+		}
+
+		return false;
+	}
 
     public function fetch( $query, $params = array() )
     {
         try
         {
         	$q = $this->db->prepare($query);
-        	$q->execute($params);
+			if (!$q) {
+				Bot::log('Bad query: '. $query);
+				return false;
+			}
+			$q->execute($params);
         	return $q->fetch(\PDO::FETCH_ASSOC);
         }
         catch( \PDOException $e )
@@ -63,7 +72,11 @@ class Database
         try
         {
         	$q = $this->db->prepare($query);
-        	$q->execute($params);
+			if (!$q) {
+				Bot::log('Bad query: '. $query);
+				return false; // should throw exception
+			}
+			$q->execute($params);
         	return $q->fetchAll(\PDO::FETCH_ASSOC);
         }
         catch( \PDOException $e )
@@ -126,70 +139,69 @@ class Database
 
 	public function install( $name, $schema )
 	{
-	    $fp = null;
-	    $tables = array();
+		$fp = null;
+		$tables = array();
 
-	    if ( !file_exists($schema) || ($fp = fopen($schema, 'r')) === false )
-	    {
-	        throw new \Exception('Unable to open schema for reading');
-	    }
+		if ( !file_exists($schema) || ($fp = fopen($schema, 'r')) === false )
+		{
+			throw new \Exception('Unable to open schema for reading');
+		}
 
-	    $i = 0;
-	    while ( ($line = fgets($fp)) !== false)
-	    {
-	        $i++;
-	        $line = strtolower($line);
+		$i = 0;
+		while ( ($line = fgets($fp)) !== false)
+		{
+			$i++;
 
-	        if ( preg_match('/^create\stable\s([a-z0-9_]+)\s.*;$/', $line, $m) )
-	        {
-	            if ( $this->hasTable($m[1]) )
-	            {
-	                throw new \Exception('Table exists');
-	            }
+			if ( preg_match('/^create\stable\s([a-z0-9_]+)\s.*;$/', strtolower($line), $m) )
+			{
+				if ( $this->hasTable($m[1]) )
+				{
+					throw new \Exception('Table exists');
+				}
 
-	            if ( !$this->execute(rtrim($line, ';')) )
-	            {
-	                throw new \Exception("Unable to create table '{$m[1]}'.");
-	            }
+				if ( !$this->execute(rtrim($line, ';')) )
+				{
+					throw new \Exception("Unable to create table '{$m[1]}'.");
+				}
 
-	            $tables[] = $m[1];
-	        }
-            else if ( preg_match('/^insert\sinto\s([a-z0-9_]+)\s.*;$/', $line, $m) )
-            {
-                if ( !in_array($m[1], $tables) )
-                {
-                    throw new \Exception('Trying to insert in to restricted table.');
-                }
+				$tables[] = $m[1];
+			}
+			else if ( preg_match('/^insert\sinto\s([a-z0-9_]+)\s.*;$/', strtolower($line), $m) )
+			{
+				if ( !in_array($m[1], $tables) )
+				{
+					throw new \Exception('Trying to insert in to restricted table.');
+				}
 
-	            if ( !$this->execute(rtrim($line, ';')) )
-	            {
-	                throw new \Exception("Unable to insert line '$i' from schema '{$schema}'.");
-	            }
-            }
+				if ( !$this->execute(rtrim($line, ';')) )
+				{
+					throw new \Exception("Unable to insert line '$i' from schema '{$schema}'.");
+				}
+			}
 
-            unset($m);
-	    }
+			unset($m);
+		}
 
-	    if (!empty($tables))
-	    {
-    	    $this->execute('INSERT INTO plugins (plugin) VALUES(?)', array($name));
-    	    $pluginId = $this->lastInsertId();
+		if (!empty($tables))
+		{
+			$this->execute('INSERT INTO plugins (plugin) VALUES(?)', array($name));
+			$pluginId = $this->lastInsertId();
 
-    	    foreach($tables as $table)
-    	    {
-    	        $this->execute('INSERT INTO plugin_tables (plugin, tablename) VALUES (?, ?)', array($pluginId, $table));
-	        }
-	    }
+			foreach($tables as $table)
+			{
+				$this->execute('INSERT INTO plugin_tables (plugin, tablename) VALUES (?, ?)', array($pluginId, $table));
+			}
+		}
 	}
 
 	public function isInstalled( $name )
 	{
-	    if ( !$this->fetchScalar('SELECT 1 FROM plugins WHERE plugin = :name', array('name'=>$name)) )
-	    {
-	        return false;
-	    }
+		$isInstalled = $this->fetchScalar(
+			'SELECT 1 FROM plugins WHERE plugin = :name',
+			array('name'=>$name)
+		);
 
-	    return true;
+		return (bool)$isInstalled;
 	}
 
 	/**
@@ -197,7 +209,7 @@ class Database
 	 */
 	public function createdBy( $tableName )
 	{
-	    return $this->fetchScalar('SELECT a.plugin FROM plugins as a JOIN plugin_tables as b ON a.id=b.plugin WHERE b.tablename = ? LIMIT 1', array($tableName));
+		return $this->fetchScalar('SELECT a.plugin FROM plugins as a JOIN plugin_tables as b ON a.id=b.plugin WHERE b.tablename = ? LIMIT 1', array($tableName));
 	}
 
     /**

@@ -1,8 +1,8 @@
 <?php
-namespace Bot\Daemon;
+namespace Bot;
 use Bot\Bot as Bot;
 
-class Channel
+class Channels
 {
     protected $channels;
 
@@ -25,45 +25,42 @@ class Channel
         $this->channels[$channel]['users'][$nick] = new \Bot\Hostmask( "{$nick}!{$ident}@{$host}" );
     }
 
-    public function onJoin( \Bot\Event\Irc $event )
-    {
-        $channel = $event->getParam(0);
-        $hostmask = $event->getHostmask();
-        $nick = $event->getHostmask()->getNick();
+	public function onJoin( \Bot\Event\Irc $event )
+	{
+		$channel = $event->getParam(0);
+		$hostmask = $event->getHostmask();
+		$nick = $event->getHostmask()->getNick();
 
-        if ( $nick == Bot::getServer()->getNick() )
-        {
-            $this->channels[$channel] = array(
-            	'resync' => true,
-                'users' => array(),
-            );
+		if ( $nick == $event->getServer()->getNick() )
+		{
+			$this->channels[$channel] = array(
+				'resync' => true,
+				'users' => array(),
+			);
 
-            Bot::getServer()->doRaw("WHO $channel");
-        }
-        else
-        {
-            $this->channels[$channel]['users'][$hostmask->getNick()] = $hostmask;
-        }
-    }
+			$event->getServer()->doRaw("WHO $channel");
+		}
+		else
+		{
+			$this->channels[$channel]['users'][$hostmask->getNick()] = $hostmask;
+		}
+	}
 
     /**
-     * @todo broken fix it.
-     *
      * @param unknown_type $event
      */
     public function onKick( \Bot\Event\Irc $event )
-    {
-        $chan = $event->getParam(0);
-        $target = $event->getParam(1);
-        if ( !isset($this->channels[$chan]['users'][$target]) )
-        {
-            return;
-        }
+	{
+		$chan = $event->getParam(0);
+		$target = $event->getParam(1);
+		if ( !isset($this->channels[$chan]['users'][$target]) )
+		{
+			return;
+		}
 
-        //$ChannelEvent = new Channel\Event( 'kick', $event );
-        //$ChannelEvent->addChannel( $chan );
-        //$ChannelEvent-setTarget( $this->channels[$chan]['users'][$target] );
-        //Bot::getEventHandler()->raise( $ChannelEvent );
+		$target = $this->channels[$chan]['users'][$target];
+		$event->setParam('target', $target);
+		unset($this->channels[$chan]['users'][$target]);
     }
 
     public function onNick( \Bot\Event\Irc $event )
@@ -91,7 +88,7 @@ class Channel
         $channel = $event->getParam(0);
         $nick = $event->getHostmask()->getNick();
 
-        if ( $nick == $this->getNick() )
+        if ( $nick == $event->getServer()->getNick() )
         {
             unset($this->channels[$channel]);
         }

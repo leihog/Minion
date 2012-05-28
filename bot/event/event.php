@@ -10,23 +10,41 @@ abstract class Event
 	{
 		$this->name = $eventName;
 
+		if ( !is_array($params) ) {
+			echo "-------\n", $params, "\n-------\n";
+			return;
+		}
+
+		foreach( $params as $key => $value )
+		{
+			if (!is_numeric($key))
+			{
+				if (property_exists($this, $key))
+				{
+					$this->$key = $value;
+					unset($params[$key]);
+				}
+			}
+		}
+		$this->params = $params;
+/*
 		if (is_array($params))
 		{
-            foreach( $params as $key => $value )
-    		{
-    		    if (!is_numeric($key))
-    		    {
-        			$method = "set{$key}";
-        			if (method_exists($this, $method))
-        			{
-        				$this->$method($value);
-        				unset($params[$key]); /** @todo unsetting keys inside foreach is bad. Don't do it. */
-        			}
-    		    }
-    		}
+			foreach( $params as $key => $value )
+			{
+				if (!is_numeric($key))
+				{
+					if (property_exists($this, $key))
+					{
+						$this->$key = $value;
+						unset($params[$key]);
+					}
+				}
+			}
 		}
 
 		$this->params = $params;
+*/
 	}
 
 	public function getName()
@@ -36,12 +54,17 @@ abstract class Event
 
 	public function getParam($index, $default = false)
 	{
-	    if ( isset($this->params[$index]) )
-	    {
-	        return $this->params[$index];
-	    }
+		if ( isset($this->params[$index]) )
+		{
+			return $this->params[$index];
+		}
 
-	    return $default;
+		return $default;
+	}
+
+	public function setParam($index, $value)
+	{
+		$this->params[$index] = $value;
 	}
 
 	public function getParams()

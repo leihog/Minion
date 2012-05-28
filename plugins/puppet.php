@@ -4,88 +4,93 @@ use Bot\Bot as Bot;
 
 class Puppet extends Plugin
 {
-    public function cmdJoin( \Bot\Event\Irc $event, $channel, $key = '' )
-    {
-        $this->doJoin($channel, $key);
-    }
+	public function cmdJoin( \Bot\Event\Irc $event, $channel, $key = '' )
+	{
+		$event->getServer()->doJoin($channel, $key);
+	}
 
-    public function cmdPart( \Bot\Event\Irc $event, $channel )
-    {
-        $this->doPart($channel);
-    }
+	public function cmdPart( \Bot\Event\Irc $event, $channel )
+	{
+		$event->getServer()->doPart($channel);
+	}
 
-    public function cmdQuit( \Bot\Event\Irc $event, $msg = 'zZz' )
-    {
-        $this->doQuit( $msg );
-    }
+	public function cmdQuit( \Bot\Event\Irc $event, $msg = 'zZz' )
+	{
+		$event->getServer()->doQuit( $msg );
+	}
 
-    public function cmdHello( \Bot\Event\Irc $event )
-    {
-        $this->doPrivmsg($event->getSource(), "Hello, how are you?");
-    }
+	public function cmdHello( \Bot\Event\Irc $event )
+	{
+		$event->getServer()->doPrivmsg($event->getSource(), "Hello, how are you?");
+	}
 
-    public function cmdRaw( \Bot\Event\Irc $event, $raw )
-    {
-        $this->doRaw( $raw );
-    }
+	public function cmdRaw( \Bot\Event\Irc $event, $raw )
+	{
+		$event->getServer()->doRaw( $raw );
+	}
 
-	/**
-	 * @todo don't show users on channels with modes +k +s unless user is on channel or user is bot admin
-	 */
-    public function cmdWho( \Bot\Event\Irc $event, $chan, $mode = 'compact' )
-    {
-        if ( $event->isFromChannel() )
-        {
-            return;
-        }
+	public function cmdSay( \Bot\Event\Irc $event, $target, $msg )
+	{
+		$server = $event->getServer();
+		$server->doPrivmsg($target, $msg);
+	}
 
-        $nick = $event->getHostmask()->getNick();
-        if ( !in_array($chan[0], array('#', '&', '!', '~', '+')) )
-        {
-            $chan = "#{$chan}";
-        }
+	public function cmdWho( \Bot\Event\Irc $event, $chan, $mode = 'compact' )
+	{
+		if ( $event->isFromChannel() )
+		{
+			return;
+		}
 
-        $channelDaemon = Bot::getChannelDaemon();
+		$server = $event->getServer();
 
-        if ( !$channelDaemon->isOn($chan) )
-        {
-            $this->doPrivmsg($nick, "I'm not watching that channel.");
-            return;
-        }
+		$nick = $event->getHostmask()->getNick();
+		if ( !in_array($chan[0], array('#', '&', '!', '~', '+')) )
+		{
+			$chan = "#{$chan}";
+		}
 
-        if ( $channelDaemon->isSyncing($chan) )
-        {
-            $this->doPrivmsg($nick, "Channel is resynchronizing, try again in a little while...");
-            return;
-        }
+		$channelDaemon = Bot::getChannelDaemon();
 
-        $usersEnabled = ( Bot::getPluginHandler()->hasPlugin('users') ? true : false );
+		if ( !$channelDaemon->isOn($chan) )
+		{
+			$server->doPrivmsg($nick, "I'm not watching that channel.");
+			return;
+		}
 
-        $users = $channelDaemon->getUsers($chan);
-        $userCount = count($users);
+		if ( $channelDaemon->isSyncing($chan) )
+		{
+			$server->doPrivmsg($nick, "Channel is resynchronizing, try again in a little while...");
+			return;
+		}
 
-        $this->doPrivmsg($nick, sprintf('Showing %s user%s on %s', $userCount, ($userCount == 1 ? '':'s'), $chan ));
+		$usersEnabled = ( Bot::getPluginHandler()->hasPlugin('users') ? true : false );
 
-        switch($mode)
-        {
-            case 'detailed':
-                break;
+		$users = $channelDaemon->getUsers($chan);
+		$userCount = count($users);
 
-            default:
+		$server->doPrivmsg($nick, sprintf('Showing %s user%s on %s', $userCount, ($userCount == 1 ? '':'s'), $chan ));
 
-                $list = array();
-                foreach( $users as $userNick => $userHostmask )
-                {
-                    if ( $usersEnabled && \Bot\User::isIdentified( $userHostmask ) )
-                    {
-                        $userNick .= '*';
-                    }
+		switch($mode)
+		{
+			case 'detailed':
+				break;
 
-                    $list[] = $userNick;
-                }
+			default:
 
-    		    $this->doPrivmsg($nick, $this->formatTableArray( $list, "%-10s", 4, 15 ));
-        }
+				$list = array();
+				foreach( $users as $userNick => $userHostmask )
+				{
+					if ( $usersEnabled && \Bot\User::isIdentified( $userHostmask ) )
+					{
+						$userNick .= '*';
+					}
 
-    }
+					$list[] = $userNick;
+				}
+
+				$server->doPrivmsg($nick, $this->formatTableArray( $list, "%-10s", 4, 15 ));
+		}
+
+	}
 }

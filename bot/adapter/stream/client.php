@@ -1,85 +1,64 @@
 <?php
-namespace Bot\Socket\Client;
-use Bot\Bot;
+namespace Bot\Adapter\Stream;
+use \Bot\Bot as Bot;
 
-/** @todo should events be handled in SocketHandler instead? */
-abstract class Stream
+class Client
 {
 	protected $resource;
 	protected $socketId;
-	
-	protected $host;
-	protected $port;
-	protected $transport;
-	
-	public function __construct( $options )
-	{
-		foreach( $options as $key => $value )
-		{
-			$method = "set{$key}";
-			if (method_exists($this, $method))
-			{
-				$this->$method($value);
-			}
-		}
-	}
 
 	/**
-	 * 
 	 * @todo add support for ipv6 host (ipv6 ips must be enclosed in [], ex: 'tcp://[df63::1]:80' )
 	 * @todo test STREAM_CLIENT_ASYNC_CONNECT as a connect param
 	 */
-	public function connect()
+	public function connect( $transport, $host, $port )
 	{
 		$errorCode = $errorString = false;
-		$host = "{$this->transport}://{$this->host}:{$this->port}";
+		$host = "{$transport}://{$host}:{$port}";
 		$this->resource = @stream_socket_client( $host, $errorCode, $errorString );
 		if (!$this->resource)
 		{
-			echo "Unable to connect to {$host}, reason: $errorString.\n";
+			Bot::log("Unable to connect to {$host}, reason: $errorString.");
 			return false;
 		}
 
 		stream_set_blocking($this->resource, false);
 		$this->socketId = stream_socket_get_name($this->resource, true);
-		Bot::getSocketHandler()->addSocket($this);
-
 		return true;
 	}
 	
 	public function disconnect()
 	{
-	    fclose($this->getResource());
-		Bot::getSocketHandler()->removeSocket($this);
-	}
-
-	public function getHost()
-	{
-		return $this->host;
-	}
-
-	public function getPort()
-	{
-		return $this->port;
+		fclose($this->getResource());
 	}
 
 	/**
-	 * Returns the actual socket resource
-	 * @return resource socket
+	 * Returns the network resource
+	 * @return resource
 	 */
 	public function getResource()
 	{
 		return $this->resource;
 	}
-	
+
 	public function getSocketId()
 	{
 		return $this->socketId;
 	}
-	
+
+	public function isConnected()
+	{
+		$info = stream_get_meta_data($this->resource);
+		if ( $info['eof'] || $info['timed_out'] )
+		{
+			return false;
+		}
+		return true;
+	}
+
 	/**
 	 * Reads up to $length bytes from the socket.
-	 * 
+	 *
 	 * @param int $length
 	 */
 	public function read( $length = 2048 )
@@ -91,7 +70,7 @@ abstract class Stream
 			{
 				break;
 			}
-			
+
 			$buffer .= $data;
 			$length = ($length - $bytesRead);
 			
@@ -103,18 +82,18 @@ abstract class Stream
 
 		return $buffer;
 	}
-	
+
 	/**
 	 * @todo support utf8 (mb_strlen($string, '8bit');)
-	 * 
+	 *
 	 * @param string $string
 	 */
-	protected function write( $string )
+	public function write( $string )
 	{
-		$stringLength = strlen($string);
 		$bytesWritten = 0;
 		$writeAttempts = 0;
-		
+		$stringLength = strlen($string);
+
 		while ($bytesWritten < $stringLength)
 		{
 			$b = fwrite( $this->resource, substr($string, $bytesWritten) );
@@ -126,25 +105,13 @@ abstract class Stream
 			{
 				$bytesWritten += $b;
 			}
-			
-			if ($writeAttempts == 3) {
-				throw new \Exception('Unable to write to socket...'); /** @todo handle this better. maybe close/remove socket? */
+
+			if ($writeAttempts == 3)
+			{ /** @todo handle this better. maybe close/remove socket? */
+				throw new \Exception('Unable to write to socket...');
 			}
 		}
 	}
-	
-	public function setHost( $host )
-	{
-		$this->host = $host;
-	}
-	
-	public function setPort( $port )
-	{
-		$this->port = $port;
-	}
-	
-	public function setTransport( $transport )
-	{
-		$this->transport = $transport;
-	}
+
+
 }
