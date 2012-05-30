@@ -54,7 +54,9 @@ class Bot
 	{
 		Bot::log("Shutting down ($msg).");
 		$this->engineOn = false;
-		$this->serverConnection->doQuit($msg);
+		if ( $this->serverConnection ) {
+			$this->serverConnection->doQuit($msg);
+		}
 	}
 
 	protected function init()
@@ -133,6 +135,12 @@ class Bot
 		}
 	}
 
+	/**
+	 * Main loop, keeps us running.
+	 *
+	 * this is built for single server usage, but I haven't actually 
+	 * decided if I want to go multiserver or not yet.
+	 */
 	protected function main()
 	{
 		$lastRetry = 0;
@@ -205,10 +213,6 @@ class Bot
 		exit();
 	}
 
-	public function shutdown($msg)
-	{
-		self::getInstance()->doShutdown($msg);
-	}
 
 	// Static methods
 	/**
@@ -272,16 +276,6 @@ class Bot
 		}
 	}
 
-	public static function getServer()
-	{
-		if ( !self::getInstance()->serverConnection )
-		{
-			return false;
-		}
-
-		return self::getInstance()->serverConnection;
-	}
-
 	public static function log( $msg )
 	{
 		if ( self::$instance->log ) {
@@ -289,6 +283,11 @@ class Bot
 		} else {
 			echo $msg, "\n";
 		}
+	}
+
+	public static function shutdown($msg)
+	{
+		self::$instance->doShutdown($msg);
 	}
 
 	public static function uptime()
