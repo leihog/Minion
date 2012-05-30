@@ -160,7 +160,7 @@ class Server implements IConnection
 		}
 
 		Event::dispatch(
-			new \Bot\Event\Irc( 'Disconnect', array('server' => $this) )
+			new \Bot\Event\Connection( 'Disconnect', array('connection' => $this) )
 		);
 	}
 
