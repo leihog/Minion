@@ -131,4 +131,9 @@ class Admin extends Plugin
 		$event->getServer()->doPrivmsg($nick, "Unloaded plugin '{$plugin}'.");
 	}
 
+	public function cmdUptime( \Bot\Event\Irc $event )
+	{
+		$uptime = "My uptime is: ". Bot::uptime();
+		$event->getServer()->doPrivmsg($event->getSource(), $uptime);
+	}
 }
