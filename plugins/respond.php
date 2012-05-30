@@ -9,9 +9,6 @@ use Bot\Bot as Bot;
  * - Mention:  Not directed at the bot but contains bot nick.
  * - Public:   these are messages sent to a channel.
  *
- * @todo Token replacement in replies
- * @todo when searching for botnick use both current nick and altnicks.
- * @todo after a reply has triggered flag it so that it's not used again for a while
  * @todo addresponse can't handle multiple types yet.
  * @todo add support for the duration parameter.
  * @todo subcmddelResponse should use transactions.
@@ -20,7 +17,6 @@ use Bot\Bot as Bot;
  * @todo we might want to use safer $id in del[match|except|reply] function
  * @todo optimize out preg_replace
  * @todo we should keep track of getResponse search times.
- * @todo could replace with a Response class
  */
 class Respond extends Plugin
 {
@@ -45,12 +41,14 @@ class Respond extends Plugin
 	public function init()
 	{
 		$db = Bot::getDatabase();
-		if (!$db->isInstalled($this->getName())) {
-			$db->install( $this->getName(), __DIR__ . '/respond.schema' );
+		$pluginName = $this->getName();
+		if (!$db->isInstalled($pluginName)) {
+			Bot::log("Installing plugin '{$pluginName}'.");
+			$db->install($pluginName, __DIR__ . '/respond.schema' );
 		}
 
 		// load responses - We might need to optimize this.
-		$rows = $db->fetchAll("SELECT name, types, chance FROM respond_groups");
+		$rows = $db->fetchAll("SELECT name, type, chance FROM respond_groups");
 		foreach( $rows as $row ) {
 			$response = $this->newResponse($row);
 			$this->responses[$response->name] = $response;
@@ -91,14 +89,40 @@ class Respond extends Plugin
 
 		$msg = $event->getParam(1);
 		$type = $this->getMessageType($event);
-		
+
 		$group = $this->getResponse($type, $msg);
 		if ( !$group ) {
 			return; // No match
 		}
 
 		$reply = $this->getReply($group);
+		$offset = 0;
+		while ( ($pos = strpos($reply, '\\', $offset)) !== false ) {
+			$token = $this->translateToken($reply[$pos+1], $event);
+			$reply = substr_replace($reply, $token, $pos, 2);
+			$offset += strlen($token);
+		}
+
 		$this->respond($event->getServer(), $event->getSource(), $reply);
+	}
+
+	/**
+	 * Tokens:
+	 * n - Nick of user we are responding to.
+	 * c - Channel we are responding in or IRC if not on a channel
+	 * b - Bot nick
+	 * u - Uptime
+	 */
+	protected function translateToken($token, &$event)
+	{
+		switch($token)
+		{
+		case 'n': return $event->getNick(); break;
+		case 'b': return $event->getBotNick(); break;
+		case 'c': return ($event->isFromChannel() ? $event->getSource() : 'IRC' ); break;
+		case 'u': return Bot::uptime(); break;
+		default: return ''; break;
+		}
 	}
 
 	/**
@@ -216,8 +240,8 @@ class Respond extends Plugin
 
 		$db = Bot::getDatabase();
 		$r = $db->execute(
-			"INSERT INTO respond_groups (name, types) VALUES(?,?)",
-			array($groupName, $type)
+			"INSERT INTO respond_groups (name, type, chance) VALUES(?,?,?)",
+			array($groupName, $type, 100)
 		);
 		if ($r) {
 			$response = $this->newResponse(array(
@@ -263,8 +287,15 @@ class Respond extends Plugin
 		}
 
 		if ( $chance >= 1 && $chance <= 100 ) {
-			$this->responses[$groupName]->chance = $chance;
-			return true;
+			$db = Bot::getDatabase();
+			$r = $db->execute(
+				"UPDATE respond_groups SET chance = ? WHERE name = ?",
+				array($chance, $groupName)
+			);
+			if ($r) {
+				$this->responses[$groupName]->chance = $chance;
+				return true;
+			}
 		}
 
 		return false;
@@ -295,8 +326,6 @@ class Respond extends Plugin
 		}
 
 		$response = $this->responses[$groupName];
-
-		//if ( !isset($this->patterns[$groupName]['except'][$id]) ) {
 		if ( !isset($response->except[$id]) ) {
 			throw new \Exception("Unable to find except", 666);
 		}
@@ -305,13 +334,11 @@ class Respond extends Plugin
 		$r = $db->execute(
 			"DELETE FROM respond_patterns WHERE groupname = ? AND ".
 			"type = 'except' AND pattern = ?",
-			//array($groupName, $this->patterns[$groupName]['except'][$id])
 			array($groupName, $response->except[$id])
 		);
 		if (!$r) {
 			throw new \Exception('Unable to delete except', 666);
 		}
-		//unset( $this->patterns[$groupName]['except'][$id] );
 		unset( $response->except[$id] );
 		return true;
 	}
@@ -341,8 +368,6 @@ class Respond extends Plugin
 		}
 		
 		$response = $this->responses[$groupName];
-
-		//if ( !isset($this->patterns[$groupName]['match'][$id]) ) {
 		if ( !isset($response->match[$id]) ) {
 			throw new \Exception("Unable to find match", 666);
 		}
@@ -351,13 +376,11 @@ class Respond extends Plugin
 		$r = $db->execute(
 			"DELETE FROM respond_patterns WHERE groupname = ? AND ".
 			"type = 'match' AND pattern = ?",
-			//array($groupName, $this->patterns[$groupName]['match'][$id])
 			array($groupName, $response->match[$id] )
 		);
 		if (!$r) {
 			throw new \Exception('Unable to delete match', 666);
 		}
-		//unset( $this->patterns[$groupName]['match'][$id] );
 		unset( $response->match[$id] );
 		return true;
 	}
@@ -505,7 +528,7 @@ class Respond extends Plugin
 		return $matches;
 	}
 
-	protected function respond(&$server, $source, $response)
+	protected function respond($server, $source, $response)
 	{
 		list($cmd, $response) = explode(" ", $response, 2);
 		switch(strtolower($cmd))
@@ -525,13 +548,34 @@ class Respond extends Plugin
 	protected function getReply($group)
 	{
 		$replies =& $this->responses[$group]->replies;
-
-		$count = sizeof($replies);
-		if ( $count == 1 ) {
+		if ( sizeof($replies) == 1 ) {
 			return $replies[0];
 		}
 
-		return $replies[ (mt_rand(1, $count) -1) ];
+		$lottery = array();
+		if ( !empty($this->responses[$group]->rhits) ) {
+			foreach ( array_keys($replies) as $key ) {
+				if ( !isset($this->responses[$group]->rhits[$key]) ) {
+					$lottery[] = $key;
+				}
+			}
+		}
+
+		$count = count($lottery);
+		if ( $count == 0 ) {
+			$lottery = array_keys($replies);
+			$count = count($lottery);
+			$this->responses[$group]->rhits = array();
+		}
+		
+		if ( $count == 1 ) {
+			$winner = $lottery[0];
+		} else {
+			$winner = $lottery[ (mt_rand(1, $count) -1) ];
+		}
+
+		$this->responses[$group]->rhits[$winner] = true;
+		return $replies[ $winner ];
 	}
 
 	/**
@@ -545,12 +589,10 @@ class Respond extends Plugin
 	{
 		foreach ( $this->groupsByType[$type] as $response ) {
 
-			//if ( !$this->evalMatch($msg, $this->patterns[$response->name]['match']) ) {
 			if ( !$this->evalMatch($msg, $response->match) ) {
 				continue; // if match fails then continue search
 			}
 
-			//if ( $this->evalMatch($msg, $this->patterns[$response->name]['except']) ) {
 			if ( $this->evalMatch($msg, $response->except) ) {
 				continue; // if except matches then continue search
 			}
@@ -558,7 +600,7 @@ class Respond extends Plugin
 			// If chance is larger than $response->chance then we skip.
 			$chance = mt_rand(1, 100);
 			if ( $chance  > $response->chance ) {
-				continue; // allow fate to take it's course
+				continue;
 			}
 			return $response->name;
 		}
@@ -596,33 +638,67 @@ class Respond extends Plugin
 
 	protected function getMessageType(&$event)
 	{
-		$msg = $event->getParam(1);
-		$botnick = $event->getServer()->getNick();
-
 		if ( !$event->isFromChannel() ) {
 			return self::TYPE_TARGETED;
 		}
 
-		if ( ($pos = strpos($msg, $botnick)) === false ) {
-			return self::TYPE_PUBLIC;
+		$msg = trim($event->getParam(1));
+		$botnick = $event->getServer()->getNick();
+
+		if ( !$this->isNickMentioned($botnick, $msg) ) {
+			$preferedNick = \Bot\Config::get('irc/nick');
+			if ( $preferedNick != $botnick && $this->isNickMentioned($preferedNick, $msg) ) {
+				$botnick = $preferedNick;
+			} else {
+				return self::TYPE_PUBLIC;
+			}
 		}
 
-		$bl = strlen($botnick);
-		if ( $pos == 0 && strpbrk($msg[$bl], ':,> ') ) {
+		if ( stripos($msg, $botnick) === 0 ) {
 			return self::TYPE_TARGETED;
-		} else {
-			return self::TYPE_MENTION;
 		}
+
+		return self::TYPE_MENTION;
 	}
-	protected function newResponse(&$data)
+
+	/**
+	 * Check if $nick is mentioned in $msg.
+	 * The character in front of $nick may only be a space or a ','
+	 * while the character directly following $nick may be one of ',.!?:>'
+	 * or a space.
+	 *
+	 * @param string $nick
+	 * @param string $msg
+	 * @return bool
+	 */
+	protected function isNickMentioned($nick, $msg)
+	{
+		if ( ($pos = stripos($msg, $nick)) === false ) {
+			return false;
+		}
+		
+		if ( $pos != 0 && !strpbrk($msg[$pos-1], ', ') ) {
+			return false;
+		}
+
+		$after = $pos + strlen($nick);
+		if ( isset($msg[$after]) && !strpbrk($msg[$after], ',.!?:> ') ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	protected function newResponse($data)
 	{
 		$response = new \StdClass();
 		$response->name    = $data['name'];
-		$response->type    = $data['types'];
+		$response->type    = $data['type'];
 		$response->chance  = $data['chance'];
 		$response->replies = array();
-		$response->matches = array();
-		$response->excepts = array();
+		$response->match   = array();
+		$response->except  = array();
+		$response->rhits   = array();
 
 		// Not sure we want to allow a response to be of several types.
 		if ( ($response->type & self::TYPE_PUBLIC) ) {

@@ -1,9 +1,9 @@
-CREATE TABLE respond_groups (name TEXT, types INTEGER, chance INTEGER);
+CREATE TABLE respond_groups (name TEXT, type INTEGER, chance INTEGER);
 CREATE TABLE respond_patterns (groupname TEXT, pattern TEXT, type TEXT);
 CREATE TABLE respond_replies (groupname TEXT, reply TEXT);
-INSERT INTO respond_groups (name, types, chance) VALUES('greetings', 3, 100);
-INSERT INTO respond_groups (name, types, chance) VALUES('time', 4, 100);
-INSERT INTO respond_groups (name, types, chance) VALUES('awesome', 4, 100);
+INSERT INTO respond_groups (name, type, chance) VALUES('greetings', 3, 100);
+INSERT INTO respond_groups (name, type, chance) VALUES('time', 4, 100);
+INSERT INTO respond_groups (name, type, chance) VALUES('awesome', 4, 100);
 INSERT INTO respond_patterns (groupname, pattern, type) VALUES('greetings', 'hello', 'match');
 INSERT INTO respond_patterns (groupname, pattern, type) VALUES('greetings', 'hi', 'match');
 INSERT INTO respond_patterns (groupname, pattern, type) VALUES('greetings', 'morning', 'match');
