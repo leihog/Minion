@@ -5,6 +5,7 @@ class Bot
 {
 	protected static $instance;
 
+	protected $startTime;
 	/** @var string Path to bots working directory */
 	protected $workingDirectory;
 	protected $dataDirectory;
@@ -123,6 +124,7 @@ class Bot
 				$this->pluginHandler->loadPlugin($plugin);
 			}
 
+			$this->startTime = time();
 			$this->main();
 		}
 		catch( \Exception $e )
@@ -287,6 +289,25 @@ class Bot
 		} else {
 			echo $msg, "\n";
 		}
+	}
+
+	public static function uptime()
+	{
+		$now = new \DateTime();
+		$uptime= $now->diff(new \DateTime('@'.self::$instance->startTime));
+
+		$pluralize = function($str) {
+			if ( $str[0] > 1 ) return $str . 's';
+			return $str;
+		};
+
+		$ret = array();
+		if ( $uptime->d > 0 ) $ret[] = $pluralize("{$uptime->d} day");
+		if ( $uptime->h > 0 ) $ret[] = $pluralize("{$uptime->h} hour");
+		if ( $uptime->i > 0 ) $ret[] = $pluralize("{$uptime->i} minute");
+		if ( $uptime->s > 0 ) $ret[] = $pluralize("{$uptime->s} second");
+
+		return implode(' ', $ret);
 	}
 
 	// Event Handlers
