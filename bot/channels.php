@@ -4,13 +4,14 @@ use Bot\Bot as Bot;
 
 class Channels
 {
-    protected $channels;
+	protected $channels;
 
-    public function on315( \Bot\Event\Irc $event )
-    {
-        $channel = array_shift(explode(' ', $event->getParam(0)));
-        $this->channels[$channel]['resync'] = false;
-    }
+	public function on315( \Bot\Event\Irc $event )
+	{
+		$tmp = explode(' ', $event->getParam(0));
+		$channel = array_shift($tmp);
+		$this->channels[$channel]['resync'] = false;
+	}
 
     public function on352( \Bot\Event\Irc $event )
     {

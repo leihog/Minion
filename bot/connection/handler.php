@@ -55,7 +55,9 @@ class Handler
 
 		$read = $this->resources;
 		$write = $this->resources;
-		if ( ($num = stream_select($read, $write, $except = null, $tv_sec = null)) === false )
+		$except = null;
+		$tv_usec = null;
+		if ( ($num = stream_select($read, $write, $except, 0, $tv_usec)) === false )
 		{
 			Bot::log("Error: stream_select returned false...");
 			/** @todo do something real */
@@ -64,20 +66,18 @@ class Handler
 
 		foreach( $read as $resourceId )
 		{
-			if (isset($this->connections[$resourceId]))
+			if (isset($this->connections[(int)$resourceId]))
 			{
-				$connection = $this->connections[$resourceId];
-				//$connection->read();
+				$connection = $this->connections[(int)$resourceId];
 				$connection->onCanRead();
 			}
 		}
 
 		foreach( $write as $resourceId )
 		{
-			if (isset($this->connections[$resourceId]))
+			if (isset($this->connections[(int)$resourceId]))
 			{
-				$connection = $this->connections[$resourceId];
-				//$connection->processWriteQueue();
+				$connection = $this->connections[(int)$resourceId];
 				$connection->onCanWrite();
 			}
 		}
