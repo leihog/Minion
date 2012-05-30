@@ -53,6 +53,11 @@ class Irc extends Event
 		return $this->hostmask->getNick();
 	}
 
+	public function getBotNick()
+	{
+		return $this->server->getNick();
+	}
+
 	public function getChannels()
 	{
 	    return $this->channels;
@@ -62,6 +67,18 @@ class Irc extends Event
 	{
 	    $this->channels = $channels;
 	}
+	/**
+	 * Returns the nick of the user that caused the event
+	 * or null if no user was involved.
+	 */
+	public function getNick()
+	{
+		if ( !$this->hostmask ) {
+			return null;
+		}
+		return $this->hostmask->getNick();
+	}
+
 	public function getServer()
 	{
 		return $this->server;
