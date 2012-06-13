@@ -1,7 +1,9 @@
 <?php
 namespace Bot\Plugin;
+
 use Bot\Bot as Bot;
 use Bot\Config as Config;
+use Bot\User as User;
 
 class Acl extends Plugin
 {
@@ -15,37 +17,31 @@ class Acl extends Plugin
 		$this->defaultCommandLevel = Config::get('plugins/acl/default-level', 0);
 		$this->restrictCmds = Config::get('plugins/acl/restrict-cmds', false);
 
-		if ( !Bot::getDatabase()->isInstalled($this->getName()) )
-		{
+		$db = Bot::getDatabase();
+		if ( !$db->isInstalled($this->getName()) ) {
 			echo "Installing plugin ", $this->getName(), "\n";
-			$db = Bot::getDatabase();
 			$db->install( $this->getName(), __DIR__ . '/acl.schema' );
 		}
 
 		$this->loadAcl();
 		Bot::getCommandDaemon()->addAclHandler( $this );
-
-		echo "Acl loaded with ", count($this->accessControlList), " commands.\n";
+		Bot::log("Acl loaded with ", count($this->accessControlList), " commands.\n");
 	}
 
 	public function checkACL( $cmdName, $event )
 	{
-		$hostmask = $event->getHostmask();
-
 		$currentLevel = 0;
-		if ( \Bot\User::isIdentified( $hostmask ) )
-		{
-			$user = \Bot\User::getIdentifiedUser( $hostmask );
+		$hostmask = $event->getHostmask();
+		if (User::isIdentified($hostmask)) {
+			$user = User::fetch($hostmask);
 			$currentLevel = $user->getLevel();
 		}
 
-		if ( !isset($this->accessControlList[ $cmdName ]) )
-		{
+		if ( !isset($this->accessControlList[ $cmdName ]) ) {
 			return true;
 		}
 
-		if ( $this->accessControlList[ $cmdName ] <= $currentLevel )
-		{
+		if ( $this->accessControlList[ $cmdName ] <= $currentLevel ) {
 			return true;
 		}
 
@@ -53,10 +49,10 @@ class Acl extends Plugin
 	}
 
 	/**
-		* @todo this should be available even without the acl plugin.
-		*
-		* @param unknown_type $event
-		*/
+	 * @todo this should be available even without the acl plugin.
+	 *
+	 * @param unknown_type $event
+	 */
 	public function cmdCmds( \Bot\Event\Irc $event )
 	{
 		$hostmask = $event->getHostmask();
@@ -69,24 +65,24 @@ class Acl extends Plugin
 			return;
 		}
 
-		$user = \Bot\User::getIdentifiedUser($hostmask); /** @todo make a method that only returns user level */
-		$level = ( $user ? $user->getLevel() : 0);
-		$cmds = Bot::getCommandDaemon()->getCommands();
+		$level = 0;
+		if (User::isIdentified($hostmask)) {
+			$user = User::fetch($hostmask);
+			$level = $user->getLevel();
+		}
 
+		$cmds = Bot::getCommandDaemon()->getCommands();
 		$userCmds = array();
-		foreach( $cmds as &$cmd )
-		{
+		foreach( $cmds as &$cmd ) {
 			$cmdLevel = ( isset($this->accessControlList[$cmd]) ? $this->accessControlList[$cmd] : $this->defaultCommandLevel );
-			if ( $cmdLevel > $level )
-			{
+			if ( $cmdLevel > $level ) {
 				continue;
 			}
 
 			$userCmds[] = array($cmdLevel, $cmd);
 		}
 
-		if ( ($cmdCount = count($userCmds)) )
-		{
+		if ( ($cmdCount = count($userCmds)) ) {
 			$server->doPrivmsg($nick, sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
 			$server->doPrivmsg($nick, $this->formatTableArray( $userCmds, "[%3s] %-14s", 4, 20 ));
 		}
