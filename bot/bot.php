@@ -1,6 +1,8 @@
 <?php
 namespace Bot;
 
+require_once('functions.php');
+
 class Bot
 {
 	protected static $instance;
