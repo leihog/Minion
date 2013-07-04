@@ -1,15 +1,16 @@
 <?php
 namespace Bot\Plugin;
+
 use Bot\Bot as Bot;
 
 class Loader
 {
+	protected $blueprintPath;
 	protected $blueprints = array();
-	protected $blueprintFileResolver;
 
-	public function setFileResolver( $resolver )
+	public function __construct($path)
 	{
-		$this->blueprintFileResolver = $resolver;
+		$this->blueprintPath = rtrim($path, '/') . '/';
 	}
 
 	/**
@@ -38,11 +39,12 @@ class Loader
 
 	protected function getBlueprintFile( $class )
 	{
-		if ( !isset($this->blueprintFileResolver) ) {
-			throw new \Exception('No Blueprint file resolver');
+		$class = str_replace(array('\Bot\Plugin\\', '\\'), array('', '/'), $class);
+		if ($class == 'Plugin' ) {
+			return 'bot/plugin/plugin.php';
 		}
 
-		return $this->blueprintFileResolver->resolve($class);
+		return $this->blueprintPath . strtolower($class) . '.php';
 	}
 
 	/**
@@ -57,17 +59,21 @@ class Loader
 			$blueprint = '\\' . $blueprint;
 		}
 
-		$blueprintFile = $this->getBlueprintFile($blueprint);
-		$contents = file_get_contents( $blueprintFile );
+		$relativeFilename = $this->getBlueprintFile($blueprint);
+		$blueprintFile = realpath($relativeFilename);
+		if (!$blueprintFile) {
+			throw new \Exception("Unable to load file '{$relativeFilename}'");
+		}
 
-		$fingerprint = sha1($contents);
-		$blueprintClass = substr($blueprint, strrpos($blueprint, '\\')+1) . '_' . $fingerprint;
+		$fingerprint = sha1_file($blueprintFile);
 		$qualifiedClass = $blueprint . '_' . $fingerprint;
-
 		if ( class_exists($qualifiedClass, false) ) {
 			Bot::log("Class '{$qualifiedClass}' already loaded...");
 			return false;
 		}
+
+		$contents = file_get_contents( $blueprintFile );
+		$blueprintClass = substr($blueprint, strrpos($blueprint, '\\')+1) . '_' . $fingerprint;
 
 		$defaultNamespace = '';
 		$tokens = token_get_all($contents);
@@ -122,22 +128,12 @@ class Loader
 				} else if ($token[0] == T_DIR) {
 					$token[1] = "'" . dirname($blueprintFile) . "'";
 				}
-				/* HALT_COMPILER doesn't work because we can't correctly get the
- 				 * offset from __COMPILER_HALT_OFFSET since our buffer is
-				 * different from the file on disk. It could work if we counted
-				 * the bytes while we were rewriting the contents, but is it
-				 * worth it?
- 				  else if ( $token[0] == T_HALT_COMPILER ) {
-					$contents .= '__halt_compiler();';
-				}
-				*/
 
 				$contents .= (is_array($token) ? $token[1] : $token);
 			}
 		}
 
 		//echo $contents, "\n----\n";
-		Bot::log( "Parsing {$blueprintFile}..." );
 		eval($contents);
 
 		if (!class_exists($qualifiedClass, false)) {
@@ -163,7 +159,7 @@ class Loader
 
 	/**
 	 * Creates an instance of $class using the stored blueprint (classname)
-	 *
+	 * @todo check if class is fully namespaced
 	 * @param string $class
 	 */
 	public function createInstance()
@@ -174,11 +170,8 @@ class Loader
 
 		$args = func_get_args();
 		$class = array_shift($args);
-
-		// @todo check if class is fully namespaced
-
 		$class = $this->getBlueprint( $class );
-		if ( empty($args) || !method_exists($class_name,  '__construct') ) {
+		if ( empty($args) || !method_exists($class,  '__construct') ) {
 			return new $class();
 		}
 

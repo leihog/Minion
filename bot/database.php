@@ -1,15 +1,9 @@
 <?php
 namespace Bot;
 
-/**
- * @todo cache fetch statements
- */
-
 class Database
 {
 	protected $db;
-	protected $pcache; // cached prepared statements
-
 	protected $internalTables = array(
 		'users' => 'CREATE TABLE users (id INTEGER, username TEXT, password TEXT, salt TEXT, level INTEGER, added INTEGER, PRIMARY KEY(id ASC))',
 		'hostmasks' => 'CREATE TABLE hostmasks (id INTEGER, user_id INTEGER, mask TEXT, PRIMARY KEY(id ASC))',
@@ -22,35 +16,44 @@ class Database
 		if (!extension_loaded('PDO') || !extension_loaded('pdo_sqlite')) {
 			throw new \Exception('PDO and pdo_sqlite extensions must be installed');
 		}
-		$this->initialize();
+
+		$dbFile = Bot::getDir('data') . '/bot.db';
+		$this->db = new \PDO('sqlite:' . $dbFile);
+		
+		$this->initialize(); // @todo this should move out of here.
 	}
 
-	protected function doExecute($query, $params = array(), $noCache = false)
+	protected function initialize()
+	{
+		foreach(array_keys($this->internalTables) as $table) {
+			if (!$this->hasTable($table)) {
+				$this->createTable($table);
+			}
+		}
+
+	}
+	protected function doExecute($query, $params)
 	{
 		try {
-			if ( !$noCache ) {
-				if ( !isset($this->pcache[$query]) ) {
-					$q = $this->db->prepare($query);
-					$this->pcache[$query] = $q;
-				} else {
-					$q = $this->pcache[$query];
+			if ( !is_array($params) || empty($params) ) {
+				$r = $this->db->exec($query);
+				if (false !== $r) {
+					return $r;
 				}
+				$error =$this->db->errorInfo();
+				$errorMsg = $error[2];
 			} else {
-				$q = $this->db->prepare($query);
-			}
-
-			if (!$q) {
-				Bot::log('Bad query: '. $query);
-				return false;
-			}
-
-			$q->execute($params);
-			if ($q->errorCode() == '00000') {
-				return true;
+				$q = $this->prepare($query);
+				$q->execute($params);
+				if ($q->errorCode() == '00000') {
+					return true;
+				}
 			}
 		} catch( \PDOException $e ) {
-			Bot::log($e->getMessage());
+			$errorMsg = $e->getMessage();
 		}
+
+		Bot::log($errorMsg);
 		return false;
 	}
 
@@ -64,15 +67,11 @@ class Database
 	 * @param mixed|array $params
 	 * @return bool
 	 */
-	public function execute( $query, $params = array() )
+	public function execute($query, $params = array())
 	{
-		if ( !is_array($params) ) {
-			$params = array($params);
-		}
-
 		if ( is_array($query) ) {
 			$this->db->beginTransaction();
-			foreach($query as $q) {
+			foreach($query as $q) { // @todo Do not allow transactions that result in commit
 				if (!$this->doExecute($q, $params)) {
 					$this->db->rollback();
 					return false;
@@ -85,13 +84,19 @@ class Database
 		}
 	}
 
-	public function fetch( $query, $params = array() )
+	public function prepare($query)
+	{
+		$q = $this->db->prepare($query);
+		if (!$q) {
+			throw new \Exception('Bad query: '. $query); // @todo get error from PDO?
+		}
+		return $q;
+	}
+
+	public function fetch($query, $params = array())
 	{
 		try {
-			$q = $this->db->prepare($query);
-			if (!$q) {
-				throw new \Exception('Bad query: '. $query); // @todo get error from PDO?
-			}
+			$q = $this->prepare($query);
 			$q->execute($params);
 			return $q->fetch(\PDO::FETCH_ASSOC);
 		} catch( \PDOException $e ) {
@@ -100,13 +105,10 @@ class Database
 		return null;
 	}
 
-	public function fetchAll( $query, $params = array() )
+	public function fetchAll($query, $params = array())
 	{
 		try {
-			$q = $this->db->prepare($query);
-			if (!$q) {
-				throw new \Exception('Bad query: '. $query); // @todo get error from PDO?
-			}
+			$q = $this->prepare($query);
 			$q->execute($params);
 			return $q->fetchAll(\PDO::FETCH_ASSOC);
 		} catch( \PDOException $e ) {
@@ -118,10 +120,7 @@ class Database
 	public function fetchColumn( $query, $params )
 	{
 		try {
-			$q = $this->db->prepare($query);
-			if (!$q) {
-				throw new \Exception('Bad query: '. $query); // @todo get error from PDO?
-			}
+			$q = $this->prepare($query);
 			$q->execute($params);
 			return $q->fetchAll( \PDO::FETCH_COLUMN );
 		} catch( \PDOException $e ) {
@@ -133,10 +132,7 @@ class Database
 	public function fetchScalar( $query, $params = array() )
 	{
 		try {
-			$q = $this->db->prepare($query);
-			if (!$q) {
-				throw new \Exception('Bad query: '. $query); // @todo get error from PDO?
-			}
+			$q = $this->prepare($query);
 			$q->execute($params);
 			return $q->fetchColumn(0);
 		} catch( \PDOException $e ) {
@@ -145,112 +141,18 @@ class Database
 		return null;
 	}
 
-	protected function initialize()
-	{
-		$dbFile = Bot::getDir('data') . '/bot.db';
-		$this->db = new \PDO('sqlite:' . $dbFile);
-
-		foreach(array_keys($this->internalTables) as $table) {
-			if (!$this->hasTable($table)) {
-				$this->createTable($table);
-			}
-		}
-
-		$this->pcache = array();
-	}
-
-
-	// @todo should remove created tables if the process fails.
-	// @todo should not use execute() call $this->db->exec() instead.
-	// @todo this should be in pluginhandler
-	public function install( $name, $schema )
-	{
-		Bot::log("Installing plugin '{$name}'.");
-		$fp = null;
-		$tables = array();
-
-		if ( !file_exists($schema) || ($fp = fopen($schema, 'r')) === false )
-		{
-			throw new \Exception('Unable to open schema for reading');
-		}
-
-		$i = 0;
-		while ( ($line = fgets($fp)) !== false)
-		{
-			$i++;
-
-			if ( preg_match('/^create\stable\s([a-z0-9_]+)\s.*;$/', strtolower($line), $m) )
-			{
-				if ( $this->hasTable($m[1]) )
-				{
-					throw new \Exception('Table exists');
-				}
-				
-				if ( !$this->execute(rtrim($line, ';')) )
-				{
-					throw new \Exception("Unable to create table '{$m[1]}'.");
-				}
-
-				$tables[] = $m[1];
-			}
-			else if ( preg_match('/^insert\sinto\s([a-z0-9_]+)\s.*;$/', strtolower($line), $m) )
-			{
-				if ( !in_array($m[1], $tables) )
-				{
-					throw new \Exception('Trying to insert in to restricted table.');
-				}
-
-				if ( !$this->execute(rtrim($line, ';')) )
-				{
-					throw new \Exception("Unable to insert line '$i' from schema '{$schema}'.");
-				}
-			}
-
-			unset($m);
-		}
-
-		if (!empty($tables))
-		{
-			$this->execute('INSERT INTO plugins (plugin) VALUES(?)', array($name));
-			$pluginId = $this->lastInsertId();
-
-			foreach($tables as $table)
-			{
-				$this->execute('INSERT INTO plugin_tables (plugin, tablename) VALUES (?, ?)', array($pluginId, $table));
-			}
-		}
-	}
-
-	public function isInstalled( $name )
-	{
-		$isInstalled = $this->fetchScalar(
-			'SELECT 1 FROM plugins WHERE plugin = :name',
-			array('name'=>$name)
-		);
-
-		return (bool)$isInstalled;
-	}
-
 	/**
-	 * Returns the plugin that created the table
+	 * Determines if a table exists
+	 *
+	 * @param string $name Table name
+	 *
+	 * @return bool
 	 */
-	public function createdBy( $tableName )
+	public function hasTable($name)
 	{
-		return $this->fetchScalar('SELECT a.plugin FROM plugins as a JOIN plugin_tables as b ON a.id=b.plugin WHERE b.tablename = ? LIMIT 1', array($tableName));
+		$sql = 'SELECT COUNT(*) FROM sqlite_master WHERE name = ' . $this->db->quote($name);
+		return (bool) $this->db->query($sql)->fetchColumn();
 	}
-
-    /**
-     * Determines if a table exists
-     *
-     * @param string $name Table name
-     *
-     * @return bool
-     */
-    protected function hasTable($name)
-    {
-        $sql = 'SELECT COUNT(*) FROM sqlite_master WHERE name = ' . $this->db->quote($name);
-        return (bool) $this->db->query($sql)->fetchColumn();
-    }
 
 	protected function createTable($name)
 	{

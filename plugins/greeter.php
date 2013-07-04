@@ -15,10 +15,10 @@ class Greeter extends Plugin
 			throw new \Exception('Respond plugin is required.');
 		}
 
-		$db = Bot::getDatabase();
 		$name = $this->getName();
-		if (!$db->isInstalled($name)) {
-			$db->install($name, __DIR__ .'/greeter.schema');
+		if (!\Bot\Schema::isInstalled($name)) {
+			$schema = new \Bot\Schema($name, __DIR__ .'/greeter.schema');
+			$schema->install();
 		}
 	}
 

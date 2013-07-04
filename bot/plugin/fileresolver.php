@@ -14,9 +14,7 @@ class FileResolver
 	public function resolve( $class )
 	{
 		$class = str_replace(array('\Bot\Plugin\\', '\\'), array('', '/'), $class);
-		Bot::log("loading: $class from {$this->pluginPath}");
-		if ($class == 'Plugin' )
-		{
+		if ($class == 'Plugin' ) {
 			return 'bot/plugin/plugin.php';
 		}
 

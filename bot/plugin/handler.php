@@ -1,5 +1,6 @@
 <?php
 namespace Bot\Plugin;
+
 use Bot\Event\Dispatcher as Event;
 use Bot\Bot as Bot;
 
@@ -8,11 +9,9 @@ class Handler
 	protected $plugins = array();
 	protected $loader;
 
-	public function __construct( $path )
+	public function __construct($path)
 	{
-		$loader = new Loader();
-		$loader->setFileResolver(new FileResolver( rtrim($path, '/') . '/' ));
-		$this->loader = $loader;
+		$this->loader = new Loader($path);
 	}
 
 	public function __call($name, $params)
@@ -46,8 +45,7 @@ class Handler
 	public function loadPlugin( $name )
 	{
 		if ( !$this->hasPlugin($name) ) {
-			try
-			{
+			try {
 				$plugin = $this->loader->createInstance( '\Bot\Plugin\\' . $name );
 				$this->plugins[ $name ] = $plugin;
 				$plugin->init();
@@ -57,9 +55,7 @@ class Handler
 					new \Bot\Event\Plugin('loadplugin', array('plugin' => $name))
 				);
 				return true;
-			}
-			catch( \Exception $e )
-			{
+			} catch(\Exception $e) {
 				Bot::log("Failed to load plugin '{$name}', Reason: {$e->getMessage()}.");
 			}
 		}
@@ -98,13 +94,11 @@ class Handler
 
 	public function reloadPlugin( $name, $force = false )
 	{
-		if ( !$this->hasPlugin( $name ) )
-		{
+		if ( !$this->hasPlugin( $name ) ) {
 			return false;
 		}
 
-		if ( $this->loader->loadClass( '\Bot\Plugin\\' . $name ) )
-		{
+		if ( $this->loader->loadClass( '\Bot\Plugin\\' . $name ) ) {
 			$this->unloadPlugin($name);
 			$this->loadPlugin($name);
 			return true;

@@ -118,6 +118,7 @@ class Command
 	{
 		$publicCommandPrefix = "!";
 		list($source, $input) = $event->getParams();
+		$input = trim($input);
 		if ($event->isFromChannel() && $input[0] != $publicCommandPrefix) {
 			return false;
 		}

@@ -54,6 +54,9 @@ class Bot
 	 */
 	protected function doShutdown($msg)
 	{
+		Bot::log('Saving bot memory...');
+		$this->memory->save();
+
 		Bot::log("Shutting down ($msg).");
 		$this->engineOn = false;
 		if ( $this->serverConnection ) {
@@ -112,6 +115,10 @@ class Bot
 
 			Bot::log("Booting up...");
 			$this->database = new Database();
+			$this->memory = new \Bot\Memory\Memory(
+				new \Bot\Memory\DbStorage()
+			);
+
 			// @todo should tell it to use streams here.
 			// perhaps by adding a \Adapter\Stream\Selector
 			$this->connectionHandler = new Connection\Handler();
@@ -276,6 +283,11 @@ class Bot
 		{
 			return self::$instance;
 		}
+	}
+
+	public static function memory()
+	{
+		return self::getInstance()->memory;
 	}
 
 	public static function log( $msg )

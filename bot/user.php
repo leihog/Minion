@@ -186,18 +186,22 @@ class User
 		return false;
 	}
 
-    public static function fetchAll()
-    {
-        $db = Bot::getDatabase();
-        $users = $db->fetchAll('SELECT * FROM users');
+	public static function fetchAll()
+	{
+		$db = Bot::getDatabase();
+		$users = $db->fetchAll('SELECT * FROM users');
+		foreach($users as &$user) {
+			$user = new self($user);
+		}
 
-        foreach($users as &$user)
-        {
-            $user = new self($user);
-        }
+		return $users;
+	}
 
-        return $users;
-    }
+	public static function userList()
+	{
+		$db = Bot::getDatabase();
+		return $db->fetchAll('SELECT username, level FROM users');
+	}
 
     protected static function hashPassword( $password, $salt )
     {

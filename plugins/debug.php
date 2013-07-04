@@ -1,13 +1,18 @@
 <?php
 namespace Bot\Plugin;
+
 use Bot\Bot as Bot;
 
 class Debug extends Plugin
 {
-	/** @todo add  preUnload hook ( unload(), destroy() ) */
 	public function init()
 	{
 		\Bot\Event\Dispatcher::addListener($this);
+	}
+
+	public function unload()
+	{
+		\Bot\Event\Dispatcher::removeListener($this);
 	}
 
 	public function __call($method, $args)
@@ -17,25 +22,6 @@ class Debug extends Plugin
 				$this->handleIrcEvent( $args[0] );
 			}
 		}
-	}
-
-	public function cmdGcStatus($event)
-	{
-		$msg = "Garbage collector status: ". (gc_enabled() ? 'ON' : 'OFF');
-		$event->getServer()->doPrivmsg($event->getSource(), $msg);
-	}
-
-	public function cmdToggleGc($event)
-	{
-		if ( gc_enabled() ) {
-			gc_disable();
-			$msg = 'Disabled the garbage collector.';
-		} else {
-			gc_enable();
-			$msg = 'Enabled the garbage collector.';
-		}
-
-		$event->getServer()->doPrivmsg($event->getSource(), $msg);
 	}
 
 	protected function handleIrcEvent( \Bot\Event\Irc $event )

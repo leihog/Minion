@@ -87,18 +87,23 @@ class Users extends Plugin
 			return;
 		}
 
-		$users = \Bot\User::fetchAll();
+		$users = User::userList();
 		$userCount = count($users);
 		if (!$userCount) {
 			$server->doPrivmsg($nick, 'No users found.');
 			return;
 		}
 
-		$server->doPrivmsg($nick, 'Users:');
 		foreach( $users as &$user ) {
-			$user = array( $user->getLevel(), $user->getName() );
+			$user = array( $user['level'], $user['username'] );
 		}
-		unset($user);
+
+		$server->doPrivmsg($nick, 'Users:');
 		$server->doPrivmsg($nick, $this->formatTableArray($users, "[%3s] %-14s", 4, 20));
+	}
+	public function cmdUptime( \Bot\Event\Irc $event )
+	{
+		$uptime = "My uptime is: ". Bot::uptime();
+		$event->getServer()->doPrivmsg($event->getSource(), $uptime);
 	}
 }

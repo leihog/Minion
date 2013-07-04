@@ -1,10 +1,10 @@
 <?php
 namespace Bot\Plugin;
+
 use Bot\Bot;
+
 /**
  * Administrator commands.
- *
- * Warning: You might not want to run this plugin in a live environment!
  */
 class Admin extends Plugin
 {
@@ -46,15 +46,9 @@ class Admin extends Plugin
 		$source = $event->getSource();
 		$server = $event->getServer();
 
-		$size = memory_get_usage();
-		$unit = array('b','kb','mb','gb','tb','pb');
-		$memusage = @round($size/pow(1024,($i=floor(log($size ,1024)))),2).' '.$unit[$i];
-		$server->doPrivmsg($source, "Mem usage: {$memusage}");
-
-		$size = memory_get_usage(true);
-		$unit = array('b','kb','mb','gb','tb','pb');
-		$memusage = @round($size/pow(1024,($i=floor(log($size ,1024)))),2).' '.$unit[$i];
-		$server->doPrivmsg($source, "Mem usage(true): {$memusage}");
+		$usage = format_bytes(memory_get_usage(true));
+		$peak = format_bytes(memory_get_peak_usage(true));
+		$server->doPrivmsg($source, "Memory usage: {$usage}, peak: {$peak}.");
 	}
 
 	public function cmdPlugins( \Bot\Event\Irc $event )
@@ -131,9 +125,21 @@ class Admin extends Plugin
 		$event->getServer()->doPrivmsg($nick, "Unloaded plugin '{$plugin}'.");
 	}
 
-	public function cmdUptime( \Bot\Event\Irc $event )
+	public function cmdGcStatus($event)
 	{
-		$uptime = "My uptime is: ". Bot::uptime();
-		$event->getServer()->doPrivmsg($event->getSource(), $uptime);
+		$msg = "Garbage collector status: ". (gc_enabled() ? 'ON' : 'OFF');
+		$event->getServer()->doPrivmsg($event->getSource(), $msg);
+	}
+
+	public function cmdToggleGc($event)
+	{
+		if ( gc_enabled() ) {
+			gc_disable();
+			$msg = 'Disabled the garbage collector.';
+		} else {
+			gc_enable();
+			$msg = 'Enabled the garbage collector.';
+		}
+		$event->getServer()->doPrivmsg($event->getSource(), $msg);
 	}
 }

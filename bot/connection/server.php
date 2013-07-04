@@ -1,5 +1,6 @@
 <?php
 namespace Bot\Connection;
+
 use Bot\Event\Dispatcher as Event;
 
 class Server implements IConnection

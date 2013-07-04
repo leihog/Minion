@@ -17,15 +17,15 @@ class Acl extends Plugin
 		$this->defaultCommandLevel = Config::get('plugins/acl/default-level', 0);
 		$this->restrictCmds = Config::get('plugins/acl/restrict-cmds', false);
 
-		$db = Bot::getDatabase();
-		if ( !$db->isInstalled($this->getName()) ) {
-			echo "Installing plugin ", $this->getName(), "\n";
-			$db->install( $this->getName(), __DIR__ . '/acl.schema' );
+		if (!\Bot\Schema::isInstalled($this->getName()) ) {
+			Bot::log("Installing plugin ". $this->getName());
+			$schema = new \Bot\Schema($this->getName(), __DIR__ . '/acl.schema');
+			$schema->install();
 		}
 
 		$this->loadAcl();
 		Bot::getCommandDaemon()->addAclHandler( $this );
-		Bot::log("Acl loaded with ", count($this->accessControlList), " commands.\n");
+		Bot::log("Acl loaded with ". count($this->accessControlList). " commands.");
 	}
 
 	public function checkACL( $cmdName, $event )

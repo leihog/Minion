@@ -43,12 +43,13 @@ class Respond extends Plugin
 
 	public function init()
 	{
-		$db = Bot::getDatabase();
 		$pluginName = $this->getName();
-		if (!$db->isInstalled($pluginName)) {
-			$db->install($pluginName, __DIR__ . '/respond.schema' );
+		if (!\Bot\Schema::isInstalled($pluginName)) {
+			$schema = new \Bot\Schema($pluginName, __DIR__ . '/respond.schema' );
+			$schema->install();
 		}
 
+		$db = Bot::getDatabase();
 		// load responses - We might need to optimize this.
 		$rows = $db->fetchAll("SELECT name, type, chance FROM respond_responses");
 		foreach( $rows as $row ) {

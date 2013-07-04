@@ -3,7 +3,6 @@ namespace Bot\Plugin;
 
 abstract class Plugin
 {
-
 	/**
 	 * Called when the plugin is first loaded.
 	 * Do any initializations and such here.
