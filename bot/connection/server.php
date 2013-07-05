@@ -50,7 +50,7 @@ class Server implements IConnection
 		extract( \Bot\Parser\Irc::parse( $line ), EXTR_IF_EXISTS);
 
 		if ( $cmd == 'ping' ) {
-			$this->send( $this->prepare('PONG', $args[0]) );
+			$this->send( $this->prepare('PONG', $args[0]), true );
 		}
 
 		$event = new \Bot\Event\Irc($cmd, $args);
