@@ -8,7 +8,7 @@ class Chayism extends Plugin
 	{
 		$chayism = $this->getUrl('http://phpdoc.info/chayism/');
 		if ($chayism) {
-			$event->getServer()->doPrivmsg($event->getSource(), $chayism);
+			$event->respond($chayism);
 		}
 	}
 }

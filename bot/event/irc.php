@@ -88,4 +88,8 @@ class Irc extends Event
 	{
 		$this->server = $server;
 	}
+	public function respond($msg)
+	{
+		$this->getServer()->doPrivmsg($this->getSource(), $msg);
+	}
 }
