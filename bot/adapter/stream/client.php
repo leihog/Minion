@@ -22,7 +22,7 @@ class Client
 			return false;
 		}
 
-		stream_set_blocking($this->resource, false);
+		stream_set_blocking($this->resource, 0);
 		$this->socketId = stream_socket_get_name($this->resource, true);
 		return true;
 	}
@@ -64,6 +64,7 @@ class Client
 	public function read( $length = 2048 )
 	{
 		$buffer = '';
+		stream_set_chunk_size($this->resource, $length);
 		while( ($data = fread($this->resource, $length)) !== false )
 		{
 			if ( ($bytesRead = strlen($data)) === 0 )
