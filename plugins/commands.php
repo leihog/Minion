@@ -5,8 +5,43 @@ use Bot\Bot;
 use Bot\User as User;
 use Bot\Event\Irc as IrcEvent;
 
-class Users extends Plugin
+class Commands extends Plugin
 {
+	public function cmdCmds(IrcEvent $event)
+	{
+		$hostmask = $event->getHostmask();
+		$nick = $hostmask->getNick();
+		$server = $event->getServer();
+
+		if ($event->isFromChannel())
+		{
+			$server->doPrivmsg($nick, 'Syntax: /msg '. $server->getNick() . ' CMDS');
+			return;
+		}
+
+		$level = 0;
+		if (User::isIdentified($hostmask)) {
+			$user = User::fetch($hostmask);
+			$level = $user->getLevel();
+		}
+
+		$cmds = Bot::getCommandDaemon()->getCommands();
+		$userCmds = array();
+		foreach( $cmds as &$cmd ) {
+			$cmdLevel = 0; // ( isset($this->accessControlList[$cmd]) ? $this->accessControlList[$cmd] : $this->defaultCommandLevel );
+			if ( $cmdLevel > $level ) {
+				continue;
+			}
+
+			$userCmds[] = array($cmdLevel, $cmd);
+		}
+
+		if ( ($cmdCount = count($userCmds)) ) {
+			$server->doPrivmsg($nick, sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
+			$server->doPrivmsg($nick, $this->formatTableArray( $userCmds, "[%3s] %-14s", 4, 20 ));
+		}
+	}
+
 	/**
 	 * @todo if no password is given then send the syntax.
 	 * 
@@ -101,9 +136,9 @@ class Users extends Plugin
 		$server->doPrivmsg($nick, 'Users:');
 		$server->doPrivmsg($nick, $this->formatTableArray($users, "[%3s] %-14s", 4, 20));
 	}
-	public function cmdUptime( \Bot\Event\Irc $event )
+	public function cmdUptime(IrcEvent $event)
 	{
 		$uptime = "My uptime is: ". Bot::uptime();
-		$event->getServer()->doPrivmsg($event->getSource(), $uptime);
+		$event->respond($uptime);
 	}
 }

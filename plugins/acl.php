@@ -4,7 +4,7 @@ namespace Bot\Plugin;
 use Bot\Bot as Bot;
 use Bot\Config as Config;
 use Bot\User as User;
-
+// todo merge in to Command
 class Acl extends Plugin
 {
 	protected $accessControlList;
@@ -46,46 +46,6 @@ class Acl extends Plugin
 		}
 
 		return false;
-	}
-
-	/**
-	 * @todo this should be available even without the acl plugin.
-	 *
-	 * @param unknown_type $event
-	 */
-	public function cmdCmds( \Bot\Event\Irc $event )
-	{
-		$hostmask = $event->getHostmask();
-		$nick = $hostmask->getNick();
-		$server = $event->getServer();
-
-		if ($event->isFromChannel())
-		{
-			$server->doPrivmsg($nick, 'Syntax: /msg '. $server->getNick() . ' CMDS');
-			return;
-		}
-
-		$level = 0;
-		if (User::isIdentified($hostmask)) {
-			$user = User::fetch($hostmask);
-			$level = $user->getLevel();
-		}
-
-		$cmds = Bot::getCommandDaemon()->getCommands();
-		$userCmds = array();
-		foreach( $cmds as &$cmd ) {
-			$cmdLevel = ( isset($this->accessControlList[$cmd]) ? $this->accessControlList[$cmd] : $this->defaultCommandLevel );
-			if ( $cmdLevel > $level ) {
-				continue;
-			}
-
-			$userCmds[] = array($cmdLevel, $cmd);
-		}
-
-		if ( ($cmdCount = count($userCmds)) ) {
-			$server->doPrivmsg($nick, sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
-			$server->doPrivmsg($nick, $this->formatTableArray( $userCmds, "[%3s] %-14s", 4, 20 ));
-		}
 	}
 
 	public function cmdSetacl( \Bot\Event\Irc $event, $cmdName, $level = false )
