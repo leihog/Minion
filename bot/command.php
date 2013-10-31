@@ -4,16 +4,19 @@ use Bot\Bot as Bot;
 
 class Command
 {
-	protected $aclHandlers = array();
+	protected $aclHandlers;
 	protected $commands = array();
 	protected $namePrefix = 'cmd';
 
-	protected function checkAcl( $cmdName, $event )
+	public function __construct()
 	{
-		foreach( $this->aclHandlers as &$handler )
-		{
-			if ( !$handler->checkAcl($cmdName, $event) )
-			{
+		$this->aclHandlers = new \splObjectStorage();
+	}
+
+	protected function checkAcl($cmdName, $event)
+	{
+		foreach($this->aclHandlers as $handler) {
+			if (!$handler->checkAcl($cmdName, $event)) {
 				return false;
 			}
 		}
@@ -21,41 +24,33 @@ class Command
 		return true;
 	}
 
-	public function execute( $event, $name, $args )
+	public function execute($event, $name, $args)
 	{
-		if ( !$this->checkAcl( $name, $event ) )
-		{
+		if (!$this->checkAcl($name, $event)) {
 			return false;
 		}
 
-		$method = $this->commands[$name];
-		$parameters = preg_split("/ (?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/", $args, $method['total'], PREG_SPLIT_NO_EMPTY); // @todo handle single quotes
+		$cmd = $this->commands[$name];
+		$parameters = preg_split("/ (?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/", $args, $cmd['total'], PREG_SPLIT_NO_EMPTY); // @todo handle single quotes
 		array_unshift($parameters, $event);
 
-		try
-		{
-			call_user_func_array($method['pointer'], $parameters);
+		try {
+			call_user_func_array($cmd['pointer'], $parameters);
 			return true;
-		}
-		catch( \Exception $e )
-		{
+		} catch(\Exception $e) {
 			Bot::log($e->getMessage());
 			return false;
 		}
 	}
 
-	public function addAclHandler( $handler )
+	public function addAclHandler($acl)
 	{
-		if ( method_exists($handler, 'getName') )
-		{
-			$name = $handler->getName();
-		}
-		else
-		{
-			$name = get_class($handler);
-		}
+		$this->aclHandlers->attach($acl);
+	}
 
-		$this->aclHandlers[$name] = $handler;
+	public function removeAclHandler($acl)
+	{
+		$this->aclHandlers->detach($acl);
 	}
 
 	/**
@@ -66,21 +61,18 @@ class Command
 	public function extractCommandPointers($class)
 	{
 		$reflector = new \ReflectionClass($class);
-		foreach ($reflector->getMethods() as $method)
-		{
+		foreach ($reflector->getMethods() as $method) {
 			$methodName = $method->getName();
-			if ( strpos($methodName, $this->namePrefix) === 0 )
-			{
+			if (strpos($methodName, $this->namePrefix) === 0) {
 				$cmdName = strtolower(substr($methodName, strlen($this->namePrefix)));
-				if ( isset($this->commands[$cmdName]) )
-				{
+				if (isset($this->commands[$cmdName])) {
 					continue;
 				}
 
 				$this->commands[$cmdName] = array(
 					'pointer' => array($class, $methodName),
 					'total' => $method->getNumberOfParameters() -1,
-					'required' => $method->getNumberOfRequiredParameters() -1
+					'required' => $method->getNumberOfRequiredParameters() -1,
 				);
 			}
 		}
@@ -88,13 +80,13 @@ class Command
 
 	public function getCommands()
 	{
-		return array_keys($this->commands);
+		$cmds = array_keys($this->commands);
+		return $cmds;
 	}
 
-	public function has( $name )
+	public function has($name)
 	{
-		if ( isset($this->commands[$name]) )
-		{
+		if (isset($this->commands[$name])) {
 			return true;
 		}
 
@@ -139,31 +131,13 @@ class Command
 	public function removeCommandPointers( $class )
 	{
 		$reflector = new \ReflectionClass($class);
-		foreach ($reflector->getMethods() as $method)
-		{
+		foreach ($reflector->getMethods() as $method) {
 			$methodName = $method->getName();
-			if ( strpos($methodName, $this->namePrefix) === 0 )
-			{
+			if (strpos($methodName, $this->namePrefix) === 0) {
 				$cmdName = strtolower(substr($methodName, strlen($this->namePrefix)));
 				unset($this->commands[$cmdName]);
 			}
 		}
 	}
 
-	public function removeAclHandler( $handler )
-	{
-		if ( method_exists($handler, 'getName') )
-		{
-			$name = $handler->getName();
-		}
-		else
-		{
-			$name = get_class($handler);
-		}
-
-		if ( isset($this->aclHandlers[$name]) )
-		{
-			unset($this->aclHandlers[$name]);
-		}
-	}
 }
