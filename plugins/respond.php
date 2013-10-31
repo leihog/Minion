@@ -12,6 +12,7 @@ use Bot\Bot as Bot;
  * - Mention:  Not directed at the bot but contains bot nick.
  * - Public:   these are messages sent to a channel.
  *
+ * @todo utf-8 support would be nice
  * @todo replace preg_match wich calls to ctype_alnum and check for
  *       a alphanumeric chars before and after $pattern.
  * @todo can't decide what I like better. Sub Cmds or many regular commands with
@@ -673,9 +674,9 @@ class Respond extends Plugin
 		}
 
 		foreach( $patterns as $pattern ) {
-			if ( stristr($msg, $pattern) === false ) {
-				continue;
-			}
+			/* if ( stristr($msg, $pattern) === false ) { */
+			/* 	continue; */
+			/* } */
 
 			if ( preg_match('/\b'.$pattern.'\b/ui', $msg) ) {
 				return true;
