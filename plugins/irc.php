@@ -1,6 +1,9 @@
 <?php
 namespace Bot\Plugin;
+
 use Bot\Config as Config;
+use Bot\Bot as Bot;
+use Bot\Event\Event as Event;
 
 /**
  *
@@ -11,20 +14,35 @@ class Irc extends Plugin
 {
 	protected $altnicks;
 
-	public function on001( \Bot\Event\Irc $event )
+	public function onStarted(Event $event)
 	{
-		if (!empty($this->altnicks))
-		{
-			reset($this->altnicks);
-		}
+		// connect to irc networks
+		$networks = Config::get('plugins/irc/networks');
+		foreach($networks as $network) {
+			$adapter = new \Bot\adapter\Stream\Client();
+			$server = new \Bot\Connection\Server($network, $adapter);
 
-		$channels = Config::get("plugins/channel/autojoin", array());
-		if ( !empty($channels) )
-		{
-			$event->getServer()->doJoin($channels);
+			if ($server->connect()) {
+				Bot::log("Connected to {$server->getHost()}:{$server->getPort()}");
+			}
 		}
 	}
 
+	public function on001( \Bot\Event\Irc $event )
+	{
+		if (!empty($this->altnicks)) {
+			reset($this->altnicks);
+		}
+
+		$server = $event->getServer();
+		$config = $server->getConfig();
+		$channels = $config['channels'];
+		if (!empty($channels)) {
+			$server->doJoin($channels);
+		}
+	}
+
+	/** @todo altnicks should be part of the network config */
 	public function on433( \Bot\Event\Irc $event )
 	{
 		list($nick, $desc) = explode(' :', $event->getParam(0), 2);
@@ -43,12 +61,11 @@ class Irc extends Plugin
 		$event->getServer()->doNick( $newnick );
 	}
 
-	public function onConnect( \Bot\Event\Irc $event )
+	public function onConnect(\Bot\Event\Irc $event)
 	{
 		$server = $event->getServer();
-		$irc = Config::get('irc');
 
-		$server->doNick( $irc['nick'] );
-		$server->doUser( $irc['username'], $irc['realname'], $server->getHost() );
+		$server->doNick($server->getNick());
+		$server->doUser($server->getUsername(), $server->getRealname(), $server->getHost() );
 	}
 }

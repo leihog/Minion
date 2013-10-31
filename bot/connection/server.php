@@ -2,6 +2,7 @@
 namespace Bot\Connection;
 
 use Bot\Event\Dispatcher as Event;
+use Bot\Bot as Bot;
 
 class Server implements IConnection
 {
@@ -13,7 +14,11 @@ class Server implements IConnection
 	protected $realname;
 	protected $username;
 
+	protected $serverUris;
+	protected $channels;
+
 	// used for I/O
+	protected $adapter;
 	protected $buffer = '';
 	protected $writeQueue = array();
 
@@ -23,15 +28,16 @@ class Server implements IConnection
 	protected $lastChecked;
 	protected $allowance;
 
-	protected $channels;
+	// Reconnect settings
+	protected $reconnect_enabled = true;
 
-	public function __construct( $options, $adapter )
+	public function __construct($options, $adapter)
 	{
-		foreach( $options as $key => $value )
-		{
+		$this->config = $options;
+
+		foreach($options as $key => $value) {
 			$method = "set{$key}";
-			if (method_exists($this, $method))
-			{
+			if (method_exists($this, $method)) {
 				$this->$method($value);
 			}
 		}
@@ -126,22 +132,24 @@ class Server implements IConnection
 		$this->writeQueue[] = $string;
 	}
 
-	// IConnection methods
-	public function connect( $uri )
+	protected function doConnect($uri)
 	{
 		@list($transport, $host, $port) = preg_split('@\://|\:@', $uri);
-
-		if ($this->adapter->connect($transport, $host, $port))
-		{
+		if ($this->adapter->connect($transport, $host, $port)) {
 			// This should probably be stored in the adapter
 			$this->transport = $transport;
 			$this->host = $host;
 			$this->port = $port;
 
+			$this->buffer = '';
+			$this->writeQueue = [];
+			$this->reconnect_enabled = true;
+
 			// initializing anti-client-flood
 			$this->lastChecked = time();
 			$this->allowance = $this->rate;
 
+			Bot::connections()->addConnection($this);
 			Event::dispatch(
 				new \Bot\Event\Irc( 'Connect', array( 'server' => $this ) )
 			);
@@ -152,17 +160,34 @@ class Server implements IConnection
 		return false;
 	}
 
-	public function disconnect()
+	// IConnection methods
+	public function connect()
 	{
-		if ( $this->adapter->isConnected() )
-		{
-			// @todo Make sure that we finish writing the queue.. or is that not important?
+		if (($uri = current($this->serverUris)) !== false) {
+			if ($this->doConnect($uri)) {
+				reset($this->serverUris);
+				return true;
+			} else {
+				if (!next($this->serverUris)) {
+					if (false) {
+						Bot::log('Giving up reconnecting...');
+						return false;
+					}
+					reset($this->serverUris);
+				}
+				// schedule new attempt in 1 min
+				Bot::cron(60, false, [$this, 'connect']);
+			}
+		}
+		return false;
+	}
+
+	public function disconnect($msg = null)
+	{
+		$this->doQuit($msg, true);
+		if ($this->adapter->isConnected()) {
 			$this->adapter->disconnect();
 		}
-
-		Event::dispatch(
-			new \Bot\Event\Connection( 'Disconnect', array('connection' => $this) )
-		);
 	}
 
 	public function getResource()
@@ -228,8 +253,24 @@ class Server implements IConnection
 		}
 	}
 
+	public function onDisconnected()
+	{
+		Bot::log("Lost connection to {$this->getHost()}:{$this->getPort()}");
+		Event::dispatch(
+			new \Bot\Event\Connection('Disconnect', array('connection' => $this))
+		);
+
+		if ($this->reconnect_enabled) {
+			Bot::log('Should reconnect');
+		// @todo if the server disconnected us then reconnect
+		}
+	}
 
 	// getters / setters
+	public function getConfig()
+	{
+		return $this->config;
+	}
 	public function getHost()
 	{
 		return $this->host;
@@ -244,6 +285,15 @@ class Server implements IConnection
 	    return $this->nick;
 	}
 
+	public function getRealname()
+	{
+		return $this->realname;
+	}
+
+	public function getUsername()
+	{
+		return $this->username;
+	}
 	public function setNick( $nick )
 	{
 		$this->nick = $nick;
@@ -259,6 +309,10 @@ class Server implements IConnection
 		$this->username = $username;
 	}
 
+	public function setServers(array $servers)
+	{
+		$this->serverUris = $servers;
+	}
 
 	// IRC commands
 	public function doEmote( $target, $msg )
@@ -333,14 +387,15 @@ class Server implements IConnection
 		$this->send( $this->prepare('TOPIC', $args) );
 	}
 
-	public function doQuit( $reason = 'zZz' )
+	public function doQuit( $reason = 'zZz', $skipQueue = false )
 	{
-		$this->send( $this->prepare('QUIT', array($reason)), true );
+		$this->reconnect_enabled = false;
+		$this->send($this->prepare('QUIT', array($reason)), $skipQueue);
 	}
 
 	public function doRaw( $msg )
 	{
-	    $this->send( $msg );
+		$this->send( $msg );
 	}
 
 }

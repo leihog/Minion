@@ -52,14 +52,11 @@ class Bot
 	 */
 	protected function doShutdown($msg)
 	{
-		Bot::log('Saving bot memory...');
 		$this->memory->save();
 
 		Bot::log("Shutting down ($msg).");
 		$this->engineOn = false;
-		if ( $this->serverConnection ) {
-			$this->serverConnection->doQuit($msg);
-		}
+		$this->connectionHandler->disconnectAll($msg);
 	}
 
 	protected function init()
@@ -86,8 +83,7 @@ class Bot
 			$this->showHelp();
 		}
 
-		try
-		{
+		try {
 			$configFile = $this->workingDirectory . "/config.php";
 			$fileExt = pathinfo($configFile, PATHINFO_EXTENSION);
 			switch($fileExt)
@@ -111,8 +107,7 @@ class Bot
 			});
 			$this->log = $log;
 
-			Bot::log("Booting up...");
-			$this->cron = new Cron\Daemon(5);
+			$this->cron = new Cron\Daemon(5); // pulse time should be configable
 			$this->database = new Database();
 
 			// Give the bot a memory, with long term storage
@@ -124,96 +119,60 @@ class Bot
 			// perhaps by adding a \Adapter\Stream\Selector
 			$this->connectionHandler = new Connection\Handler();
 
-			$this->pluginHandler = new Plugin\Handler( $this->pluginDirectory );
+			$this->pluginHandler = new Plugin\Handler($this->pluginDirectory);
 			$this->commandDaemon = new Command();
 
-			Event\Dispatcher::addListener( $this ); // Bot is always first in stack
 			Event\Dispatcher::addListener( $this->commandDaemon );
 			Event\Dispatcher::addListener( $this->pluginHandler );
 
 			$plugins = Config::get('autoload');
-			foreach($plugins as $plugin)
-			{
+			foreach($plugins as $plugin) {
 				$this->pluginHandler->loadPlugin($plugin);
 			}
-
-			$this->startTime = time();
-			$this->main();
-		}
-		catch( \Exception $e )
-		{
+		} catch(\Exception $e) {
 			echo $e->getMessage(), "\n";
 		}
 	}
 
 	/**
 	 * Main loop, keeps us running.
-	 *
-	 * this is built for single server usage, but I haven't actually 
-	 * decided if I want to go multiserver or not yet.
 	 */
-	protected function main()
+	public function run()
 	{
-		$lastRetry = 0;
+		Bot::log("Booting up...");
+
+		$this->startTime = time();
 		$this->engineOn = true;
-		$servers = Config::get('servers');
+
+		$event = new Event\Event('started');
+		Event\Dispatcher::dispatch($event);
 
 		while($this->engineOn) {
-
-			if ( !$this->serverConnection && (Config::get('server-cycle-wait', 60) + $lastRetry) <= time() )
-			{
-				if ( ($server = current($servers)) !== false )
-				{
-					$lastRetry = time();
-					if ( $this->serverConnect($server) )
-					{
-						reset($servers);
-						$lastRetry = 0;
-					}
-					else if ( !next($servers) )
-					{
-						if ( Config::get('never-give-up', false) )
-						{
-							reset($this->servers);
-						}
-						else if ( !$this->connectionHandler->hasConnections() )
-						{
-							Bot::shutdown("All connections closed...");
-						}
-					}
-				}
-				else if ( !$this->connectionHandler->hasConnections() )
-				{
-					Bot::shutdown("All connections closed...");
-				}
-			}
-
 			if ($this->connectionHandler->hasConnections()) {
 				$this->connectionHandler->select();
 			}
 
 			$this->cron->tick();
-
 			usleep(500000);// Allow the cpu to rest...
-		} // end while
-	}
-
-	protected function serverConnect( $serverAddress )
-	{
-		Bot::log("Connecting to $serverAddress.");
-
-		/* @todo The adapter should be configurable */
-		$adapter = new \Bot\adapter\Stream\Client();
-		$server = new Connection\Server( Config::get('irc'), $adapter );
-		if ( $server->connect($serverAddress) )
-		{
-			Bot::log("Connected to {$server->getHost()}:{$server->getPort()}");
-			$this->serverConnection = $server; // @todo We shouldn't need this.
-			$this->connectionHandler->addConnection($server);
-			return true;
 		}
-		return false;
 	}
+
+	/* protected function serverConnect( $serverAddress ) */
+	/* { */
+	/* 	Bot::log("Connecting to $serverAddress."); */
+
+	/* 	/1* @todo The adapter should be configurable *1/ */
+	/* 	$adapter = new \Bot\adapter\Stream\Client(); */
+	/* 	$server = new Connection\Server( Config::get('irc'), $adapter ); */
+
+	/* 	if ($server->connect($serverAddress)) { */
+	/* 		Bot::log("Connected to {$server->getHost()}:{$server->getPort()}"); */
+	/* 		$this->serverConnection = $server; // @todo We shouldn't need this. */
+	/* 		$this->connectionHandler->addConnection($server); */
+	/* 		return true; */
+	/* 	} */
+	/* 	return false; */
+	/* } */
 
 	/**
 	 * Display Bot help and exit
@@ -270,7 +229,7 @@ class Bot
 		* return the connectionHandler
 		* @return Bot\Connection\Handler
 		*/
-	public static function getConnectionHandler()
+	public static function connections()
 	{
 		return self::getInstance()->connectionHandler;
 	}
@@ -289,7 +248,7 @@ class Bot
 
 	public static function cron($schedule, $repeat, $callback)
 	{
-		$this->cron->schedule($schedule, $repeat, $callback);
+		static::getInstance()->cron->schedule($schedule, $repeat, $callback);
 	}
 
 	public static function memory()
@@ -330,16 +289,7 @@ class Bot
 		return implode(' ', $ret);
 	}
 
-	// Event Handlers
-	public function onDisconnect( Event\Connection $event )
-	{
-		Bot::log("Lost connection to {$event->getHost()}:{$event->getPort()}");
-		if ( $event->getConnection() instanceOf \Bot\Connection\Server )
-		{
-			$this->connectionHandler->removeConnection( $event->getConnection() );
-			$this->serverConnection = null;
-		}
-	}
-
 }
-new Bot();
+
+$bot = new Bot();
+$bot->run();

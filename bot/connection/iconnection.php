@@ -3,8 +3,8 @@ namespace Bot\Connection;
 
 Interface IConnection
 {
-	public function connect( $uri );
-	public function disconnect();
+	public function connect();
+	public function disconnect($msg = null);
 
 	/**
 	 * Returns a Resource

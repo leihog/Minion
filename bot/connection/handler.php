@@ -9,12 +9,20 @@ class Handler
 	/**
 	 * @param iConnection $connection
 	 */
-	public function addConnection( IConnection $connection )
+	public function addConnection(IConnection $connection)
 	{
 		$resource = $connection->getResource();
 		$id = (int)$resource;
 		$this->connections[$id] = $connection;
 		$this->resources[$id] = $resource;
+	}
+
+	public function disconnectAll($msg)
+	{
+		foreach($this->connections as $con) {
+			$con->disconnect($msg);
+			/* $this->removeConnection($con); */
+		}
 	}
 
 	/**
@@ -42,7 +50,9 @@ class Handler
 		foreach($this->resources as $resource) {
 			if (feof($resource)) {
 				$connection = $this->connections[(int)$resource];
-				$connection->disconnect();
+				/* $connection->disconnect(); */
+				$connection->onDisconnected();
+				$this->removeConnection($connection);
 			}
 		}
 
@@ -82,7 +92,7 @@ class Handler
 	/**
 	 * @param IConnection $connection
 	 */
-	public function removeConnection( IConnection $connection )
+	protected function removeConnection(IConnection $connection)
 	{
 		$id = (int)$connection->getResource();
 		unset($this->resources[$id], $this->connections[$id]);

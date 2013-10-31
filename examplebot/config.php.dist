@@ -2,21 +2,6 @@
 
 return array(
 
-	'irc' => array(
-		'nick' => 'ExBot',
-		'username' => 'exbot',
-		'realname' => 'Example Minion Bot',
-
-		'msg-rate' => '5:8',
-		'never-give-up' => false,
-		'server-cycle-wait' => 60,
-	),
-
-	'servers' => array(
-		'tcp://localhost:6667',
-		'tcp://localhost:7000',
-	),
-
 	// Plugins to load at start up
 	'autoload' => array(
 		'irc',
@@ -34,20 +19,30 @@ return array(
 			'restrict-cmds' => true,
 		),
 
-		'channel' => array(
-			'autojoin' => array(
-				'#lair', '#secret:hemlis',
-			),
-		),
-
 		'irc' => array(
 			'altnicks' => array( '[ExBot]', 'ExBot-' )
+
+			'networks' => array(
+				array(
+					'nick' => 'ExBot',
+					'username' => 'exbot',
+					'realname' => 'I am ExBot',
+
+					'channels' => array(
+						'#world',
+					),
+
+					'servers' => array(
+						'tcp://localhost:6667',
+					),
+				),
+			),
 		),
 
 		'trac' => array(
 			'trac.url' => 'https://www.trac.net',
 			'login' => 'username:passwd',
-			'channel' => '#lair'
+			'channel' => '#trac'
 		)
 	),
 );

@@ -1,17 +1,15 @@
 <?php
 namespace Bot\Event;
 
-abstract class Event
+class Event
 {
 	protected $name;
 	protected $params;
 
-	public function __construct( $eventName, $params = array() )
+	public function __construct($eventName, $params = array())
 	{
 		$this->name = $eventName;
-
-		if ( !is_array($params) ) {
-			echo "-------\n", $params, "\n-------\n";
+		if (!is_array($params)) {
 			return;
 		}
 
@@ -27,24 +25,6 @@ abstract class Event
 			}
 		}
 		$this->params = $params;
-/*
-		if (is_array($params))
-		{
-			foreach( $params as $key => $value )
-			{
-				if (!is_numeric($key))
-				{
-					if (property_exists($this, $key))
-					{
-						$this->$key = $value;
-						unset($params[$key]);
-					}
-				}
-			}
-		}
-
-		$this->params = $params;
-*/
 	}
 
 	public function getName()

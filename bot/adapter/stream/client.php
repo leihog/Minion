@@ -16,8 +16,7 @@ class Client
 		$errorCode = $errorString = false;
 		$host = "{$transport}://{$host}:{$port}";
 		$this->resource = @stream_socket_client( $host, $errorCode, $errorString );
-		if (!$this->resource)
-		{
+		if (!$this->resource) {
 			Bot::log("Unable to connect to {$host}, reason: $errorString.");
 			return false;
 		}
@@ -26,10 +25,11 @@ class Client
 		$this->socketId = stream_socket_get_name($this->resource, true);
 		return true;
 	}
-	
+
 	public function disconnect()
 	{
-		fclose($this->getResource());
+		fclose($this->resource);
+		$this->resource = null;
 	}
 
 	/**
@@ -63,6 +63,10 @@ class Client
 	 */
 	public function read( $length = 2048 )
 	{
+		if (!$this->resource) {
+			return '';
+		}
+
 		$buffer = '';
 		stream_set_chunk_size($this->resource, $length);
 		while( ($data = fread($this->resource, $length)) !== false )
@@ -91,6 +95,10 @@ class Client
 	 */
 	public function write( $string )
 	{
+		if (!$this->resource) {
+			return;
+		}
+
 		$bytesWritten = 0;
 		$writeAttempts = 0;
 		$stringLength = strlen($string);
