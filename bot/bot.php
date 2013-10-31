@@ -49,9 +49,6 @@ class Bot
 
 	/**
 	 * Shutsdown the bot
-	 *
-	 * @todo disconnect all connections...
-	 * @todo save everything that needs to be saved...
 	 */
 	protected function doShutdown($msg)
 	{
@@ -161,8 +158,8 @@ class Bot
 		$this->engineOn = true;
 		$servers = Config::get('servers');
 
-		while( $this->engineOn )
-		{
+		while($this->engineOn) {
+
 			if ( !$this->serverConnection && (Config::get('server-cycle-wait', 60) + $lastRetry) <= time() )
 			{
 				if ( ($server = current($servers)) !== false )
@@ -191,15 +188,14 @@ class Bot
 				}
 			}
 
-			if ( $this->connectionHandler->hasConnections() )
-			{
+			if ($this->connectionHandler->hasConnections()) {
 				$this->connectionHandler->select();
 			}
 
 			$this->cron->tick();
 
 			usleep(500000);// Allow the cpu to rest...
-		}
+		} // end while
 	}
 
 	protected function serverConnect( $serverAddress )
@@ -228,7 +224,6 @@ class Bot
 		echo "Syntax: php bot.php <bot path> \n";
 		exit();
 	}
-
 
 	// Static methods
 	/**
@@ -322,7 +317,7 @@ class Bot
 		$uptime= $now->diff(new \DateTime('@'.self::$instance->startTime));
 
 		$pluralize = function($str) {
-			if ( $str[0] > 1 ) return $str . 's';
+			if (substrto($str, ' ') > 1) return $str . 's';
 			return $str;
 		};
 
