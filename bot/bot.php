@@ -17,6 +17,7 @@ class Bot
 	protected $serverConnection = null;
 	protected $connectionHandler;
 	protected $commandDaemon;
+	protected $cron;
 	protected $pluginHandler;
 	protected $log;
 
@@ -114,15 +115,18 @@ class Bot
 			$this->log = $log;
 
 			Bot::log("Booting up...");
+			$this->cron = new Cron\Daemon(5);
 			$this->database = new Database();
 
 			// Give the bot a memory, with long term storage
 			$memStore = new \Bot\Memory\DbStorage($this->database);
 			$this->memory = new \Bot\Memory\Memory($memStore);
+			$this->cron->schedule('5i', true, [$this->memory, 'save']);
 
 			// @todo should tell it to use streams here.
 			// perhaps by adding a \Adapter\Stream\Selector
 			$this->connectionHandler = new Connection\Handler();
+
 			$this->pluginHandler = new Plugin\Handler( $this->pluginDirectory );
 			$this->commandDaemon = new Command();
 
@@ -191,6 +195,8 @@ class Bot
 			{
 				$this->connectionHandler->select();
 			}
+
+			$this->cron->tick();
 
 			usleep(500000);// Allow the cpu to rest...
 		}
@@ -284,6 +290,11 @@ class Bot
 		{
 			return self::$instance;
 		}
+	}
+
+	public static function cron($schedule, $repeat, $callback)
+	{
+		$this->cron->schedule($schedule, $repeat, $callback);
 	}
 
 	public static function memory()
