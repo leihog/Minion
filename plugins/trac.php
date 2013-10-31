@@ -13,7 +13,7 @@ class Trac extends Plugin
 		}
 	}
 
-	public function onPrivmsg( \Bot\Event\Irc $event )
+	public function onPrivmsg(\Bot\Event\Irc $event)
 	{
 		if ( !$event->isFromChannel() || $event->getSource() !== Config::get('plugins/trac/channel', false) )
 		{

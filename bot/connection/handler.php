@@ -31,7 +31,7 @@ class Handler
 	 */
 	public function hasConnections()
 	{
-	    return (bool) count($this->connections);
+		return (bool) count($this->connections);
 	}
 
 	/**
@@ -39,17 +39,14 @@ class Handler
 	 */
 	public function select()
 	{
-		foreach($this->resources as $resource)
-		{
-			if (feof($resource))
-			{
+		foreach($this->resources as $resource) {
+			if (feof($resource)) {
 				$connection = $this->connections[(int)$resource];
 				$connection->disconnect();
 			}
 		}
 
-		if (empty($this->resources))
-		{
+		if (empty($this->resources)) {
 			return;
 		}
 
@@ -57,26 +54,24 @@ class Handler
 		$write = $this->resources;
 		$except = null;
 		$tv_usec = null;
-		if ( ($num = stream_select($read, $write, $except, 0, $tv_usec)) === false )
-		{
+		// @todo try select (write) and then write first and afterwards
+		//       do a new select for read. In Some cases this might work.
+		//       Not very likely tho...
+		if (($num = stream_select($read, $write, $except, 0, $tv_usec)) === false) {
 			Bot::log("Error: stream_select returned false...");
 			/** @todo do something real */
 			return;
 		}
 
-		foreach( $read as $resourceId )
-		{
-			if (isset($this->connections[(int)$resourceId]))
-			{
+		foreach( $read as $resourceId ) {
+			if (isset($this->connections[(int)$resourceId])) {
 				$connection = $this->connections[(int)$resourceId];
 				$connection->onCanRead();
 			}
 		}
 
-		foreach( $write as $resourceId )
-		{
-			if (isset($this->connections[(int)$resourceId]))
-			{
+		foreach($write as $resourceId) {
+			if (isset($this->connections[(int)$resourceId])) {
 				$connection = $this->connections[(int)$resourceId];
 				$connection->onCanWrite();
 			}
