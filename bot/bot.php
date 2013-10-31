@@ -115,9 +115,10 @@ class Bot
 
 			Bot::log("Booting up...");
 			$this->database = new Database();
-			$this->memory = new \Bot\Memory\Memory(
-				new \Bot\Memory\DbStorage()
-			);
+
+			// Give the bot a memory, with long term storage
+			$memStore = new \Bot\Memory\DbStorage($this->database);
+			$this->memory = new \Bot\Memory\Memory($memStore);
 
 			// @todo should tell it to use streams here.
 			// perhaps by adding a \Adapter\Stream\Selector

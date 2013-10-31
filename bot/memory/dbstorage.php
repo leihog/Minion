@@ -5,17 +5,19 @@ use Bot\Bot as Bot;
 
 class DbStorage /*implements iStorage */
 {
-	public function __construct()
+	protected $db;
+
+	public function __construct($db)
 	{
+		$this->db = $db;
 		// create table if it doesn't exist.
 		// 'memory' => 'CREATE TABLE memory (key TEXT, value TEXT)',
 	}
 
 	public function save($data)
 	{
-		$db = Bot::GetDatabase();
-		$update = $db->prepare("UPDATE memory SET value = :value WHERE key = :key");
-		$insert = $db->prepare("INSERT INTO memory (key, value) VALUES(:key, :value)");
+		$update = $this->db->prepare("UPDATE memory SET value = :value WHERE key = :key");
+		$insert = $this->db->prepare("INSERT INTO memory (key, value) VALUES(:key, :value)");
 
 		foreach($data as $key => $value) {
 
@@ -33,7 +35,12 @@ class DbStorage /*implements iStorage */
 
 	public function load()
 	{
-		$data = null; // load data
-		return $data;
+		$rows = $this->db->fetchAll('SELECT * FROM memory');
+
+		$values = [];
+		foreach($rows as $row) {
+			$values[$row['key']] = json_decode($row['value'], true);
+		}
+		return $values;
 	}
 }

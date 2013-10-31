@@ -1,6 +1,8 @@
 <?php
 namespace Bot\Memory;
 
+use Bot\Bot as Bot;
+
 /**
  * Keys:
  * In it's basic form a key is just a string containing a-z0-9 or a dot(.).
@@ -20,9 +22,7 @@ namespace Bot\Memory;
  * By default the memory is non persistent, meaning that on a restart everything 
  * held in memory will be lost. Memory can be configured with a storage module
  *
- * @todo implements the wildcard syntax or remove it.
- * @todo Should we save at intervals or assume that we need to refetch from db 
- * at all times?
+ * @todo implement the wildcard syntax or remove it.
  */
 class Memory
 {
@@ -32,10 +32,13 @@ class Memory
 
 	public function __construct($storage = null)
 	{
+		$values = [];
 		if ($storage) {
 			$this->storage = $storage;
+			$values = $this->storage->load();
 		}
-		$this->values = array();
+
+		$this->values = $values;
 	}
 
 	/**
@@ -199,20 +202,20 @@ class Memory
 	 */
 	protected function getArrayIndex($key)
 	{
-		if (preg_match('/[a-z0-9\.]\[(?P<index>.+)\]/i', $key, $m)) {
+		if (preg_match('/[^\[]+\[(?P<index>[^\]]+)\]/i', $key, $m)) {
 			return $m['index'];
 		}
 		return false;
 	}
 	/**
 	 * @todo only save modified elements
-	 *
 	 */
 	public function save()
 	{
 		if (!$this->storage) {
 			return;
 		}
+		Bot::log('Storing memories');
 		$this->storage->save($this->values);
 	}
 }
