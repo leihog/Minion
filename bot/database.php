@@ -1,6 +1,8 @@
 <?php
 namespace Bot;
-
+/**
+ * @todo this class is messy, should rethink the entire db strategy
+ */
 class Database
 {
 	protected $db;
@@ -154,9 +156,12 @@ class Database
 		return (bool) $this->db->query($sql)->fetchColumn();
 	}
 
-	protected function createTable($name)
+	public function createTable($name, $sql = null)
 	{
-		$sql = $this->internalTables[$name];
+		if (isset($this->internalTables[$name])) {
+			$sql = $this->internalTables[$name];
+		}
+
 		$r = $this->db->exec($sql);
 		if (!$r) {
 			/**

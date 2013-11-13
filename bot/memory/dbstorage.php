@@ -10,8 +10,9 @@ class DbStorage /*implements iStorage */
 	public function __construct($db)
 	{
 		$this->db = $db;
-		// create table if it doesn't exist.
-		// 'memory' => 'CREATE TABLE memory (key TEXT, value TEXT)',
+		if (!$db->hasTable('memory')) {
+			$db->createTable('memory', 'CREATE TABLE memory (key TEXT, value TEXT)');
+		}
 	}
 
 	public function save($data)
