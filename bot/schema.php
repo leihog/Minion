@@ -32,7 +32,7 @@ class Schema
 				if ($db->hasTable($t)) {
 					throw new \Exception("Table '{$t}' exists");
 				}
-				if (!$db->execute($stmt)) {
+				if ($db->execute($stmt) === false) {
 					throw new \Exception('Unable to create tables.');
 				} else {
 					$created[] = $t;
