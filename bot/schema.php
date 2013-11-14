@@ -39,15 +39,16 @@ class Schema
 				}
 			}
 
+			fseek($this->file, 0);
 			$i = 0;
 			$pattern = '/^insert\sinto\s([a-z0-9_]+)\s.*;$/';
 			while ( ($line = fgets($this->file)) !== false && ++$i) {
 				if (preg_match($pattern, strtolower($line), $m) ) {
-					if (!in_array($m[1], $this->tables)) {
+					if (!isset($this->tables[$m[1]])) {
 						throw new \Exception('Trying to insert in to restricted table.');
 					}
 
-					if (!$db->execute(rtrim($line, ';'))) {
+					if ($db->execute(rtrim($line, ';')) === false) {
 						throw new \Exception(
 							"Unable to insert line '$i' from schema '{$this->name}'."
 						);
