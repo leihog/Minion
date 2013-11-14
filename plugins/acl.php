@@ -1,21 +1,20 @@
 <?php
+
 namespace Bot\Plugin;
 
 use Bot\Bot as Bot;
 use Bot\Config as Config;
 use Bot\User as User;
-// todo merge in to Command
+
 class Acl extends Plugin
 {
 	protected $accessControlList;
 	protected $defaultCommandLevel;
-	protected $restrictCmds; /** @todo try and remember what this is for? */
 
 	public function init()
 	{
 		$this->accessControlList = array();
 		$this->defaultCommandLevel = Config::get('plugins/acl/default-level', 0);
-		$this->restrictCmds = Config::get('plugins/acl/restrict-cmds', false);
 
 		if (!\Bot\Schema::isInstalled($this->getName()) ) {
 			Bot::log("Installing plugin ". $this->getName());
@@ -24,11 +23,17 @@ class Acl extends Plugin
 		}
 
 		$this->loadAcl();
-		Bot::getCommandDaemon()->addAclHandler( $this );
+		Bot::getCommandDaemon()->addAclHandler($this);
 		Bot::log("Acl loaded with ". count($this->accessControlList). " commands.");
 	}
 
-	public function checkACL( $cmdName, $event )
+	public function decorateCmdListItem($cmd, $decorated)
+	{
+		$level = (isset($this->accessControlList[$cmd]) ? $this->accessControlList[$cmd] : $this->defaultCommandLevel);
+		return sprintf("[%3s] %s", $level, $decorated);
+	}
+
+	public function checkACL($cmdName, $event)
 	{
 		$currentLevel = 0;
 		$hostmask = $event->getHostmask();
@@ -37,11 +42,11 @@ class Acl extends Plugin
 			$currentLevel = $user->getLevel();
 		}
 
-		if ( !isset($this->accessControlList[ $cmdName ]) ) {
+		if (!isset($this->accessControlList[$cmdName])) {
 			return true;
 		}
 
-		if ( $this->accessControlList[ $cmdName ] <= $currentLevel ) {
+		if ($this->accessControlList[$cmdName] <= $currentLevel) {
 			return true;
 		}
 
@@ -53,13 +58,10 @@ class Acl extends Plugin
 		$hostmask = $event->getHostmask();
 		$nick = $hostmask->getNick();
 
-		if ( !$level )
-		{
+		if (!$level) {
 			$this->removeAcl($cmdName);
 			$event->getServer()->doPrivmsg($nick, "Removed ACL for {$cmdName}.");
-		}
-		else
-		{
+		} else {
 			$this->setAcl($cmdName, $level);
 			$event->getServer()->doPrivmsg($nick, "Updated ACL for {$cmdName}.");
 		}
@@ -69,16 +71,14 @@ class Acl extends Plugin
 	{
 		$db = Bot::getDatabase();
 		$list = $db->fetchAll('SELECT cmd, level FROM acl');
-		foreach($list as &$acl)
-		{
+		foreach($list as &$acl) {
 			$this->accessControlList[ $acl['cmd'] ] = $acl['level'];
 		}
 	}
 
 	protected function removeAcl($cmd)
 	{
-		if ( isset($this->accessControlList[$cmd]) )
-		{
+		if (isset($this->accessControlList[$cmd])) {
 			$db = Bot::getDatabase();
 			$db->execute('DELETE FROM acl WHERE cmd = :cmd', compact('cmd') );
 			return true;
@@ -90,17 +90,12 @@ class Acl extends Plugin
 	protected function setAcl($cmd, $level)
 	{
 		$db = Bot::getDatabase();
-
-		if ( isset($this->accessControlList[$cmd]) )
-		{
-			if ( $this->accessControlList[$cmd] != $level )
-			{
-				$db->execute('UPDATE acl SET level = :level WHERE cmd = :cmd', compact('cmd', 'level') );
+		if (isset($this->accessControlList[$cmd])) {
+			if ($this->accessControlList[$cmd] != $level) {
+				$db->execute('UPDATE acl SET level = :level WHERE cmd = :cmd', compact('cmd', 'level'));
 			}
-		}
-		else
-		{
-			$db->execute('INSERT INTO acl (cmd, level) VALUES (:cmd, :level)', compact('cmd', 'level') );
+		} else {
+			$db->execute('INSERT INTO acl (cmd, level) VALUES (:cmd, :level)', compact('cmd', 'level'));
 		}
 	}
 }

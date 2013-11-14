@@ -35,7 +35,7 @@ abstract class Plugin
 	* @param unknown_type $columns
 	* @param unknown_type $columnWidth
 	*/
-	protected function formatTableArray( $data, $format, $columns = 3, $columnWidth = 20 )
+	protected function formatTableArray($data, $format, $columns = 3, $columnWidth = 20)
 	{
 		$buffer = array();
 		$rows = array();

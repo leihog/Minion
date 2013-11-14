@@ -7,14 +7,16 @@ use Bot\Event\Irc as IrcEvent;
 
 class Commands extends Plugin
 {
+	/**
+	 * Show available commands
+	 */
 	public function cmdCmds(IrcEvent $event)
 	{
 		$hostmask = $event->getHostmask();
 		$nick = $hostmask->getNick();
 		$server = $event->getServer();
 
-		if ($event->isFromChannel())
-		{
+		if ($event->isFromChannel()) {
 			$server->doPrivmsg($nick, 'Syntax: /msg '. $server->getNick() . ' CMDS');
 			return;
 		}
@@ -25,20 +27,31 @@ class Commands extends Plugin
 			$level = $user->getLevel();
 		}
 
-		$cmds = Bot::getCommandDaemon()->getCommands();
-		$userCmds = array();
-		foreach( $cmds as &$cmd ) {
-			$cmdLevel = 0; // ( isset($this->accessControlList[$cmd]) ? $this->accessControlList[$cmd] : $this->defaultCommandLevel );
-			if ( $cmdLevel > $level ) {
-				continue;
+		$cmdD = Bot::getCommandDaemon();
+		$aclHandlers = $cmdD->getAclHandlers();
+
+		$decorator = function ($cmdName) use($cmdD) {
+			$decorated = $cmdName;
+			foreach($cmdD->getAclHandlers() as $h) {
+				$decorated = $h->decorateCmdListItem($cmdName, $decorated);
 			}
 
-			$userCmds[] = array($cmdLevel, $cmd);
+			return $decorated;
+		};
+
+		$userCmds = array();
+		$cmds = $cmdD->getCommands();
+		foreach($cmds as &$cmd) {
+			if (!$cmdD->checkAcl($cmd, $event)) {
+				continue;
+			}
+			$userCmds[] = [$decorator($cmd)];
 		}
 
-		if ( ($cmdCount = count($userCmds)) ) {
-			$server->doPrivmsg($nick, sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
-			$server->doPrivmsg($nick, $this->formatTableArray( $userCmds, "[%3s] %-14s", 4, 20 ));
+		$cmdCount = count($userCmds);
+		if ($cmdCount) {
+			$event->respond(sprintf('%s available command%s', $cmdCount, ($cmdCount == 1 ? '':'s') ));
+			$event->respond($this->formatTableArray($userCmds, "%s", 4, 20));
 		}
 	}
 

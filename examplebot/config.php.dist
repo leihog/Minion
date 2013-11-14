@@ -16,7 +16,6 @@ return array(
 	'plugins' => array(
 		'acl' => array(
 			'default-level' => 0, /* Required user level for commands that aren't explicitly restricted. */
-			'restrict-cmds' => true,
 		),
 
 		'irc' => array(

@@ -13,7 +13,7 @@ class Command
 		$this->aclHandlers = new \splObjectStorage();
 	}
 
-	protected function checkAcl($cmdName, $event)
+	public function checkAcl($cmdName, $event)
 	{
 		foreach($this->aclHandlers as $handler) {
 			if (!$handler->checkAcl($cmdName, $event)) {
@@ -46,6 +46,11 @@ class Command
 	public function addAclHandler($acl)
 	{
 		$this->aclHandlers->attach($acl);
+	}
+
+	public function getAclHandlers()
+	{
+		return $this->aclHandlers;
 	}
 
 	public function removeAclHandler($acl)
