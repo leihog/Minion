@@ -6,16 +6,17 @@ return array(
 	'autoload' => array(
 		'irc',
 		'admin',
+		'commands',
 		'users',
 		'puppet',
-		'seen',
-		'acl'
+		'acl',
+		'twitter',
 	),
 
 	// Plugin settings
 	'plugins' => array(
 		'acl' => array(
-			'default-level' => 0, /* Required user level for commands that aren't explicitly restricted. */
+			'default-level' => 0,
 		),
 
 		'irc' => array(
@@ -43,5 +44,12 @@ return array(
 			'login' => 'username:passwd',
 			'channel' => '#trac'
 		)
+
+		'twitter' => array(
+			'key' => '',
+			'secret' => '',
+			'timeout-period' => 3600,
+			'channel-access' => 'ALLOW #world',
+		),
 	),
 );
