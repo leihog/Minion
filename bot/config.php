@@ -8,20 +8,15 @@ class Config
 
 	public static function get( $section, $defaultValue = false )
 	{
-		if ( strpos($section, '/') !== false )
-		{
+		if ( strpos($section, '/') !== false ) {
 			$sections = explode('/', $section);
 			
 			$arr = self::$settings;
-			while( ($section = array_shift($sections)) )
-			{
-				if ( isset($arr[$section]) )
-				{
+			while( ($section = array_shift($sections)) ) {
+				if ( isset($arr[$section]) ) {
 					$arr = $arr[$section];
-				}
-				else
-				{
-					return ($defaultValue ? $defaultValue : false);
+				} else {
+					return $defaultValue;
 				}
 			}
 
