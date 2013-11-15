@@ -47,10 +47,13 @@ class Handler
 		if ( !$this->hasPlugin($name) ) {
 			try {
 				$plugin = $this->loader->createInstance( '\Bot\Plugin\\' . $name );
+				if ($plugin->init() === false) {
+					return false;
+				}
+
 				$this->plugins[ $name ] = $plugin;
-				$plugin->init();
 				Bot::log("Loaded plugin {$plugin->getName()}...");
-				
+
 				Event::dispatch(
 					new \Bot\Event\Plugin('loadplugin', array('plugin' => $name))
 				);

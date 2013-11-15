@@ -6,9 +6,17 @@ abstract class Plugin
 	/**
 	 * Called when the plugin is first loaded.
 	 * Do any initializations and such here.
+	 *
+	 * If init() returns boolean false the PluginHandler will discard the
+	 * plugin and proceed as if the plugin failed to load.
+	 *
+	 * Make sure to clean up any external references so we don't leak memory.
+	 *
+	 * @return boolean|void
 	 */
 	public function init()
 	{
+		return true;
 	}
 
 	/**
