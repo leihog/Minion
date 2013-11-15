@@ -58,6 +58,11 @@ class Acl extends Plugin
 		$hostmask = $event->getHostmask();
 		$nick = $hostmask->getNick();
 
+		if (!ctype_digit("$level") || $level < 0 || $level > 100) {
+			$event->respond("Level must be a number between 0 and 100.");
+			return;
+		}
+
 		if (!$level) {
 			$this->removeAcl($cmdName);
 			$event->getServer()->doPrivmsg($nick, "Removed ACL for {$cmdName}.");
@@ -79,12 +84,10 @@ class Acl extends Plugin
 	protected function removeAcl($cmd)
 	{
 		if (isset($this->accessControlList[$cmd])) {
+			unset($this->accessControlList[$cmd]);
 			$db = Bot::getDatabase();
 			$db->execute('DELETE FROM acl WHERE cmd = :cmd', compact('cmd') );
-			return true;
 		}
-
-		return false;
 	}
 
 	protected function setAcl($cmd, $level)
@@ -97,5 +100,7 @@ class Acl extends Plugin
 		} else {
 			$db->execute('INSERT INTO acl (cmd, level) VALUES (:cmd, :level)', compact('cmd', 'level'));
 		}
+
+		$this->accessControlList[$cmd] = $level;
 	}
 }
