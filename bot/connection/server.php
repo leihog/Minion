@@ -16,6 +16,7 @@ class Server implements IConnection
 
 	protected $serverUris;
 	protected $channels;
+	protected $iSupport = [];
 
 	// used for I/O
 	protected $adapter;
@@ -57,6 +58,8 @@ class Server implements IConnection
 
 		if ( $cmd == 'ping' ) {
 			$this->send( $this->prepare('PONG', $args[0]), true );
+		} else if ($cmd == '005') {
+			$this->parseISupportLine($args[0]);
 		}
 
 		$event = new \Bot\Event\Irc($cmd, $args);
@@ -86,16 +89,13 @@ class Server implements IConnection
 	protected function prepare()
 	{
 		$args = func_get_args();
-		if ( empty($args) )
-		{
+		if (empty($args)) {
 			throw new \Exception('Prepare() called with no parameters...');
 		}
 
 		$buffer = array_shift($args);
-		if ( !empty($args) )
-		{
-			if ( count($args) == 1 && is_array($args[0]) )
-			{
+		if (!empty($args)) {
+			if (count($args) == 1 && is_array($args[0])) {
 				$args = $args[0];
 				$args[] = ':'. array_pop($args);
 			}
@@ -190,6 +190,15 @@ class Server implements IConnection
 		}
 	}
 
+	protected function parseISupportLine($line)
+	{
+		$line = trim(substr($line, 0, strrpos($line, ':')));
+		$parts = explode(' ', $line);
+		foreach($parts as $part) {
+			@list($key, $value) = explode('=', $part);
+			$this->iSupport[strtolower($key)] = $value;
+		}
+	}
 	public function getResource()
 	{
 		return $this->adapter->getResource();
@@ -279,6 +288,18 @@ class Server implements IConnection
 	public function getPort()
 	{
 		return $this->port;
+	}
+	public function getNetwork()
+	{
+		if (isset($this->iSupport['network'])) {
+			return $this->iSupport['network'];
+		}
+
+		if (isset($this->config['network'])) {
+			return $this->config['network'];
+		}
+
+		return null;
 	}
 	public function getNick()
 	{
