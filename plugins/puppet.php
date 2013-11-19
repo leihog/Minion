@@ -1,90 +1,77 @@
 <?php
+
 namespace Bot\Plugin;
 use Bot\Bot as Bot;
+use Bot\Event\Irc as IrcEvent;
 
 class Puppet extends Plugin
 {
-	public function cmdJoin( \Bot\Event\Irc $event, $channel, $key = '' )
+	public function cmdJoin(IrcEvent $event, $channel, $key = '')
 	{
 		$event->getServer()->doJoin($channel, $key);
 	}
 
-	public function cmdPart( \Bot\Event\Irc $event, $channel )
+	public function cmdPart(IrcEvent $event, $channel)
 	{
 		$event->getServer()->doPart($channel);
 	}
 
-	public function cmdQuit( \Bot\Event\Irc $event, $msg = 'zZz' )
+	public function cmdQuit(IrcEvent $event, $msg = 'zZz')
 	{
-		$event->getServer()->doQuit( $msg );
+		$event->getServer()->doQuit($msg);
 	}
 
-	public function cmdHello( \Bot\Event\Irc $event )
+	public function cmdRaw(IrcEvent $event, $raw)
 	{
-		$event->getServer()->doPrivmsg($event->getSource(), "Hello, how are you?");
+		$event->getServer()->doRaw($raw);
 	}
 
-	public function cmdRaw( \Bot\Event\Irc $event, $raw )
+	public function cmdSay(IrcEvent $event, $target, $msg)
 	{
-		$event->getServer()->doRaw( $raw );
+		$event->getServer()->doPrivmsg($target, $msg);
 	}
 
-	public function cmdSay( \Bot\Event\Irc $event, $target, $msg )
+	public function cmdWho(IrcEvent $event, $chan)
 	{
-		$server = $event->getServer();
-		$server->doPrivmsg($target, $msg);
-	}
-
-	public function cmdWho( \Bot\Event\Irc $event, $chan, $mode = 'compact' )
-	{
-		if ( $event->isFromChannel() )
-		{
+		if ($event->isFromChannel()) {
 			return;
 		}
 
 		$server = $event->getServer();
-
 		$nick = $event->getHostmask()->getNick();
-		if ( !in_array($chan[0], array('#', '&', '!', '~', '+')) )
-		{
+		$channels = $server->getChannels();
+
+		if (!in_array($chan[0], array('#', '&', '!', '~', '+'))) {
 			$chan = "#{$chan}";
 		}
 
-		$channelDaemon = Bot::getChannelDaemon();
-
-		if ( !$channelDaemon->isOn($chan) )
-		{
+		$channel = $channels->get($chan);
+		if (!$channel) {
 			$server->doPrivmsg($nick, "I'm not watching that channel.");
 			return;
 		}
 
-		if ( $channelDaemon->isSyncing($chan) )
-		{
+		if ($channel->isSyncing()) {
 			$server->doPrivmsg($nick, "Channel is resynchronizing, try again in a little while...");
 			return;
 		}
 
-		$usersEnabled = ( Bot::getPluginHandler()->hasPlugin('users') ? true : false );
-
-		$users = $channelDaemon->getUsers($chan);
+		$users = $channel->getUsers();
 		$userCount = count($users);
 
+		$list = [];
+		foreach($users as $userHostmask) {
+			$userNick = $userHostmask->getNick();
+			if (\Bot\User::isIdentified($userHostmask)) {
+				$userNick .= '*';
+			}
+
+			$list[] = $userNick;
+		}
+
 		$server->doPrivmsg($nick, sprintf('Showing %s user%s on %s', $userCount, ($userCount == 1 ? '':'s'), $chan ));
-
-		switch($mode)
-		{
-			case 'detailed':
-				break;
-
-			default:
-
-				$list = array();
-				foreach( $users as $userNick => $userHostmask )
-				{
-					if ( $usersEnabled && \Bot\User::isIdentified( $userHostmask ) )
-					{
-						$userNick .= '*';
-					}
+		$server->doPrivmsg($nick, $this->formatTableArray($list, "%-10s", 4, 15));
+	}
 
 					$list[] = $userNick;
 				}

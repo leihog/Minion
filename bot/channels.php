@@ -1,6 +1,7 @@
 <?php
 namespace Bot;
 use Bot\Bot as Bot;
+use Bot\Irc\Channel as Channel;
 
 class Channels
 {
@@ -10,21 +11,26 @@ class Channels
 	{
 		$tmp = explode(' ', $event->getParam(0));
 		$channel = array_shift($tmp);
-		$this->channels[$channel]['resync'] = false;
+
+		if (isset($this->channels[$channel])) {
+			$this->channels[$channel]->setSyncing(false);
+		}
 	}
 
-    public function on352( \Bot\Event\Irc $event )
-    {
-        list($channel, $ident, $host, $server, $nick, $modes, $hopCount, $realname) = explode(' ', $event->getParam(0));
+	public function on352(\Bot\Event\Irc $event)
+	{
+		list($channel, $ident, $host, $server, $nick, $modes, $hopCount, $realname) = explode(' ', $event->getParam(0));
+		if (!isset($this->channels[$channel])) {
+			return; // perhaps we should add the channel instead.
+		}
 
-        if ( !$this->channels[$channel]['resync'] )
-        {
-            $this->channels[$channel]['resync'] = true;
-            $this->channels[$channel]['users'] = array();
-        }
+		$channel = $this->channels[$channel];
+		if (!$channel->isSyncing()) {
+			$channel->setSyncing(true);
+		}
 
-        $this->channels[$channel]['users'][$nick] = new \Bot\Hostmask( "{$nick}!{$ident}@{$host}" );
-    }
+		$channel->addUser(new \Bot\Hostmask( "{$nick}!{$ident}@{$host}"));
+	}
 
 	public function onJoin( \Bot\Event\Irc $event )
 	{
@@ -32,154 +38,113 @@ class Channels
 		$hostmask = $event->getHostmask();
 		$nick = $event->getHostmask()->getNick();
 
-		if ( $nick == $event->getServer()->getNick() )
-		{
-			$this->channels[$channel] = array(
-				'resync' => true,
-				'users' => array(),
-			);
+		if ($nick == $event->getServer()->getNick()) {
+			$chanObj = new Channel($channel);
+			$this->channels[$channel] = $chanObj;
+			/* $this->channels[$channel] = array( */
+			/* 	'resync' => true, */
+			/* 	'users' => array(), */
+			/* ); */
 
 			$event->getServer()->doRaw("WHO $channel");
-		}
-		else
-		{
-			$this->channels[$channel]['users'][$hostmask->getNick()] = $hostmask;
+		} else {
+			/* $this->channels[$channel]['users'][$hostmask->getNick()] = $hostmask; */
+			$this->channels[$channel]->addUser($hostmask);
 		}
 	}
 
     /**
      * @param unknown_type $event
      */
-    public function onKick( \Bot\Event\Irc $event )
+    public function onKick( \Bot\Event\Irc &$event )
 	{
 		$chan = $event->getParam(0);
-		$target = $event->getParam(1);
-		if ( !isset($this->channels[$chan]['users'][$target]) )
-		{
+		$nick = $event->getParam(1);
+
+		if (!isset($this->channels[$chan])) {
 			return;
 		}
 
-		$target = $this->channels[$chan]['users'][$target];
-		$event->setParam('target', $target);
-		unset($this->channels[$chan]['users'][$target]);
-    }
+		$channel = $this->channels[$chan];
+		if (!$channel->hasUser($nick)) {
+			return;
+		}
+
+		$hostmask = $channel->getUser($nick);
+		$event->setParam('target', $hostmask);
+		$channel->removeUser($hostmask);
+	}
 
     public function onNick( \Bot\Event\Irc $event )
     {
         $hostmask = $event->getHostmask();
-        $nick = $hostmask->getNick();
         $newNick = $event->getParam(0);
+		$newHostmask = clone $hostmask;
+		$newHostmask->setNick($newNick);
 
         $channels = array();
-        foreach( array_keys($this->channels) as $chan )
-        {
-            if ( isset($this->channels[$chan]['users'][$nick]) )
-            {
-                $channels[] = $chan;
-                $this->channels[$chan]['users'][$newNick] = $this->channels[$chan]['users'][$nick];
-                unset($this->channels[$chan]['users'][$nick]);
-            }
+        foreach($this->channels as $channel) {
+			if (!$channel->hasUser($hostmask->getNick())) {
+				continue;
+			}
+
+			$channels[] = $channel->getName();
+			$channel->removeUser($hostmask);
+			$channel->addUser($newHostmask);
+            /* if ( isset($this->channels[$chan]['users'][$nick]) ) */
+            /* { */
+            /*     $channels[] = $chan; */
+            /*     $this->channels[$chan]['users'][$newNick] = $this->channels[$chan]['users'][$nick]; */
+            /*     unset($this->channels[$chan]['users'][$nick]); */
+            /* } */
         }
 
-        $event->setChannels( $channels );
+        $event->setChannels($channels);
     }
 
-    public function onPart( \Bot\Event\Irc $event )
-    {
-        $channel = $event->getParam(0);
-        $nick = $event->getHostmask()->getNick();
+	public function onPart( \Bot\Event\Irc $event )
+	{
+		$channel = $event->getParam(0);
+		$hostmask = $event->getHostmask();
+		$nick = $hostmask->getNick();
 
-        if ( $nick == $event->getServer()->getNick() )
-        {
-            unset($this->channels[$channel]);
-        }
-        else if ( isset($this->channels[$channel]['users'][$nick]) )
-        {
-            unset($this->channels[$channel]['users'][$nick]);
-        }
+		if ($nick == $event->getServer()->getNick()) {
+			unset($this->channels[$channel]);
+			return;
+		}
+
+		$this->channels[$channel]->removeUser($hostmask);
+		/* else if ( isset($this->channels[$channel]['users'][$nick]) ) { */
+            /* unset($this->channels[$channel]['users'][$nick]); */
+        /* } */
     }
 
-    /**
-     * Remove the records for $nick and adds the affected channels to the event.
-     *
-     * @param \Bot\Event\Irc $event
-     */
-    public function onQuit( \Bot\Event\Irc &$event )
-    {
-        $hostmask = $event->getHostmask();
-        $nick = $hostmask->getNick();
+	/**
+	 * Remove the records for $nick and adds the affected channels to the event.
+	 *
+	 * @param \Bot\Event\Irc $event
+	 */
+	public function onQuit( \Bot\Event\Irc &$event )
+	{
+		$hostmask = $event->getHostmask();
+		$nick = $hostmask->getNick();
 
-        $channels = array();
-        foreach( array_keys($this->channels) as $chan )
-        {
-            if ( isset($this->channels[$chan]['users'][$nick]) )
-            {
-                $channels[] = $chan;
-                unset($this->channels[$chan]['users'][$nick]);
-            }
-        }
+		$channels = array();
+		foreach($this->channels as $channel) {
+			if ($channel->hasUser($nick)) {
+				$channel->removeUser($hostmask);
+				$channels[] = $channel->getName();
+			}
+		}
 
-        $event->setChannels( $channels );
-    }
+		$event->setChannels($channels);
+	}
 
-    /**
-     * Returns a list of channels that $nick is on.
-     *
-     * @param string $nick
-     */
-    public function getChannels($nick)
-    {
-        $channels = array();
-        foreach( array_keys($this->channels) as $chan )
-        {
-            if ( isset($this->channels[$chan]['users'][$nick]) )
-            {
-                $channels[] = $chan;
-            }
-        }
-
-        return $channels;
-    }
-
-    /**
-     * If bot is not on $channel false is returned.
-     * Returns true if $nick is set and if $nick is on $channel
-     *
-     * @param string $channel
-     * @param string $nick
-     */
-    public function isOn($channel, $nick = false )
-    {
-        if ( !isset($this->channels[$channel]) )
-        {
-            return false;
-        }
-
-        if ( $nick && !isset($this->channels[$channel]['users'][$nick]) )
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    public function isSyncing( $chan )
-    {
-        if ( isset($this->channels[$chan]['resync']) && $this->channels[$chan]['resync'] )
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    public function getUsers( $channel )
-    {
-        if ( isset($this->channels[$channel]) )
-        {
-            return $this->channels[$channel]['users'];
-        }
-
-        return array();
-    }
+	public function get($channel)
+	{
+		if (isset($this->channels[$channel])) {
+			return $this->channels[$channel];
+		}
+		return null;
+	}
 }

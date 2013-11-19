@@ -280,6 +280,10 @@ class Server implements IConnection
 	{
 		return $this->config;
 	}
+	public function getChannels()
+	{
+		return $this->channels;
+	}
 	public function getHost()
 	{
 		return $this->host;
