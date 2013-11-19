@@ -26,7 +26,6 @@ class Debug extends Plugin
 
 	protected function handleIrcEvent( \Bot\Event\Irc $event )
 	{
-		printf("\n=== Event: %s === \n", $event->getName());
 		echo  $event->getRaw(), "\n";
 
 		$params = $event->getParams();
@@ -36,8 +35,6 @@ class Debug extends Plugin
 				printf("  [%s] %s\n", 1+$i, $params[$i]);
 			}
 		}
-
-		echo "=== End ===\n";
 	}
 
 }
