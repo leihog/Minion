@@ -1,8 +1,9 @@
 <?php
 namespace Bot\Connection;
 
-use Bot\Event\Dispatcher as Event;
 use Bot\Bot as Bot;
+use Bot\Irc\Channel as Channel;
+use Bot\Event\Dispatcher as Event;
 
 class Server implements IConnection
 {
@@ -44,7 +45,7 @@ class Server implements IConnection
 		}
 
 		$this->adapter = $adapter;
-		$this->channels = new \Bot\Channels();
+		$this->channels = []; //new \Bot\Channels();
 	}
 
 	protected function handleInput( $line )
@@ -56,25 +57,125 @@ class Server implements IConnection
 		$cmd = $args = $raw = $hostmask = null;
 		extract( \Bot\Parser\Irc::parse( $line ), EXTR_IF_EXISTS);
 
-		if ( $cmd == 'ping' ) {
-			$this->send( $this->prepare('PONG', $args[0]), true );
-		} else if ($cmd == '005') {
-			$this->parseISupportLine($args[0]);
-		}
-
 		$event = new \Bot\Event\Irc($cmd, $args);
 		$event->setRaw($raw);
 		$event->setServer($this);
-		if ( !is_numeric($cmd) && strpos($hostmask, '@') ) {
-			$event->setHostmask( new \Bot\Hostmask( $hostmask ) );
+
+		if (!is_numeric($cmd) && strpos($hostmask, '@')) {
+			$hostmask = new \Bot\Hostmask($hostmask);
+			$event->setHostmask($hostmask);
 		}
 
-		$method = "on{$cmd}";
-		if ( method_exists($this->channels, $method) ) {
-			$this->channels->$method( $event );
-		}
+		switch($cmd) {
+			case 'ping':
+				$this->send($this->prepare('PONG', $args[0]), true);
+				break;
 
-		Event::dispatch( $event );
+			case '005':
+				$this->parseISupportLine($args[0]);
+				break;
+
+			case '315':
+				/* $tmp = explode(' ', $args[0]); */
+				/* $channel = array_shift($tmp); */
+				$channel = substrto($args[0], ' ');
+				if (isset($this->channels[$channel])) {
+					$this->channels[$channel]->setSyncing(false);
+				}
+				break;
+
+			case '352':
+				list($channel, $ident, $host, $server, $nick, $modes, $hopCount, $realname) = explode(' ', $args[0]);
+				if (!isset($this->channels[$channel])) {
+					break; // perhaps we should add the channel instead.
+				}
+
+				$channel = $this->channels[$channel];
+				if (!$channel->isSyncing()) {
+					$channel->setSyncing(true);
+				}
+
+				$channel->addUser(new \Bot\Hostmask( "{$nick}!{$ident}@{$host}"));
+				break;
+
+			case 'join':
+				$channel = $args[0];
+				$nick = $hostmask->getNick();
+
+				if ($nick == $this->getNick()) {
+					$chanObj = new Channel($channel);
+					$this->channels[$channel] = $chanObj;
+					$this->doRaw("WHO $channel");
+				} else {
+					$this->channels[$channel]->addUser($hostmask);
+				}
+				break;
+
+			case 'kick':
+				$chan = $args[0];
+				$nick = $args[1];
+
+				if (!isset($this->channels[$chan])) {
+					break;
+				}
+
+				$channel = $this->channels[$chan];
+				if (!$channel->hasUser($nick)) {
+					break;
+				}
+
+				$hostmask = $channel->getUser($nick);
+				$event->setParam('target', $hostmask);
+				$channel->removeUser($hostmask);
+				break;
+
+			case 'nick':
+				$newNick = $args[0];
+				$newHostmask = clone $hostmask;
+				$newHostmask->setNick($newNick);
+
+				$channels = [];
+				foreach($this->channels as $channel) {
+					if (!$channel->hasUser($hostmask->getNick())) {
+						continue;
+					}
+
+					$channels[] = $channel->getName();
+					$channel->removeUser($hostmask);
+					$channel->addUser($newHostmask);
+				}
+
+				$event->setChannels($channels);
+				break;
+
+			case 'part':
+				$channel = $args[0];
+				$nick = $hostmask->getNick();
+
+				if ($nick == $this->getNick()) {
+					unset($this->channels[$channel]);
+					break;
+				}
+
+				$this->channels[$channel]->removeUser($hostmask);
+				break;
+
+			case 'quit':
+				$nick = $hostmask->getNick();
+
+				$channels = array();
+				foreach($this->channels as $channel) {
+					if ($channel->hasUser($nick)) {
+						$channel->removeUser($hostmask);
+						$channels[] = $channel->getName();
+					}
+				}
+
+				$event->setChannels($channels);
+				break;
+		} // end switch
+
+		Event::dispatch($event);
 	}
 
 	/**
@@ -150,9 +251,9 @@ class Server implements IConnection
 			$this->allowance = $this->rate;
 
 			Bot::connections()->addConnection($this);
-			Event::dispatch(
-				new \Bot\Event\Irc( 'Connect', array( 'server' => $this ) )
-			);
+
+			$this->doNick($this->getNick());
+			$this->doUser($this->getUsername(), $this->getRealname(), $this->getHost());
 
 			return true;
 		}
@@ -280,6 +381,14 @@ class Server implements IConnection
 	{
 		return $this->config;
 	}
+	public function getChannel($name)
+	{
+		if (isset($this->channels[$name])) {
+			return $this->channels[$name];
+		}
+		return null;
+	}
+
 	public function getChannels()
 	{
 		return $this->channels;

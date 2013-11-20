@@ -61,11 +61,4 @@ class Irc extends Plugin
 		$event->getServer()->doNick( $newnick );
 	}
 
-	public function onConnect(\Bot\Event\Irc $event)
-	{
-		$server = $event->getServer();
-
-		$server->doNick($server->getNick());
-		$server->doUser($server->getUsername(), $server->getRealname(), $server->getHost() );
-	}
 }

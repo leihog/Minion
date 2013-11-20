@@ -22,6 +22,10 @@ class Hostmask
 		return $this->nick;
 	}
 
+	public function setNick($nick)
+	{
+		$this->nick = $nick;
+	}
 	public function getUsername()
 	{
 		return $this->username;

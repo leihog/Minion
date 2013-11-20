@@ -39,13 +39,12 @@ class Puppet extends Plugin
 
 		$server = $event->getServer();
 		$nick = $event->getHostmask()->getNick();
-		$channels = $server->getChannels();
 
 		if (!in_array($chan[0], array('#', '&', '!', '~', '+'))) {
 			$chan = "#{$chan}";
 		}
 
-		$channel = $channels->get($chan);
+		$channel = $server->getChannel($chan);
 		if (!$channel) {
 			$server->doPrivmsg($nick, "I'm not watching that channel.");
 			return;
