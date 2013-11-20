@@ -6,6 +6,8 @@ use Bot\Event\Irc as IrcEvent;
 
 class Puppet extends Plugin
 {
+	protected $forwards = [];
+
 	public function cmdJoin(IrcEvent $event, $channel, $key = '')
 	{
 		$event->getServer()->doJoin($channel, $key);
@@ -72,11 +74,82 @@ class Puppet extends Plugin
 		$server->doPrivmsg($nick, $this->formatTableArray($list, "%-10s", 4, 15));
 	}
 
-					$list[] = $userNick;
-				}
 
-				$server->doPrivmsg($nick, $this->formatTableArray( $list, "%-10s", 4, 15 ));
+	// Forwarding should only be active over DCC
+	// but we'll have to make do with this for now.
+
+	public function cmdForward(IrcEvent $event, $source = null)
+	{
+		$nick = $event->getHostmask()->getNick();
+
+		if (empty($source)) {
+			$forwards = [];
+			foreach(array_keys($this->forwards) as $key) {
+				if (isset($this->forwards[$key][$nick])) {
+					$forwards[] = $key;
+				}
+			}
+
+			$sourceCount = count($forwards);
+			if ($sourceCount) {
+				$rows[] = implode(', ', $forwards);
+			}
+			$rows[] = $sourceCount . ($sourceCount==1 ? ' source is' : ' sources are') .' being forwarded to you.';
+			$event->respond($rows);
+
+			return;
 		}
 
+		if ($source != 'msgs') {
+			$channel = $event->getServer()->getChannel($source);
+			if (!$channel) {
+				$event->respond("'{$source}' is not a valid source.");
+				return;
+			}
+		}
+
+		if (isset($this->forwards[$source][$nick])) {
+			$event->respond("You are already forwarding from {$source}.");
+			return;
+		}
+
+		$this->forwards[$source][$nick] = true;
+		$event->respond("Forwarding {$source} to you. Use 'unforward {$source}' to stop the flood.");
+	}
+
+	public function cmdUnForward(IrcEvent $event, $source)
+	{
+		$nick = $event->getHostmask()->getNick();
+		if (isset($this->forwards[$source][$nick])) {
+			unset($this->forwards[$source][$nick]);
+			$event->respond("Stopped forwarding from {$source}.");
+		} else {
+			$event->respond("You are not forwarding from {$source}.");
+		}
+	}
+
+	public function onPrivmsg(IrcEvent $event)
+	{
+		$public = $event->isFromChannel();
+		$source = ($public ? $event->getSource() : 'msgs');
+		$nick = $event->getHostmask()->getNick();
+
+		if (empty($this->forwards[$source])) {
+			return;
+		}
+
+		if ($public) {
+			$msg = '['. $source .'/'. $nick .'] '. $event->getParam(1);
+		} else {
+			$msg = '['. $nick .'] '. $event->getParam(1);
+		}
+
+		foreach($this->forwards[$source] as $target => $junk) {
+			if (!$public && $target == $nick) {
+				continue;
+			}
+
+			$event->getServer()->doPrivmsg($target, $msg);
+		}
 	}
 }
