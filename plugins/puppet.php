@@ -152,4 +152,22 @@ class Puppet extends Plugin
 			$event->getServer()->doPrivmsg($target, $msg);
 		}
 	}
+
+	public function onNotice(IrcEvent $event)
+	{
+		if (empty($this->forwards['msgs'])) {
+			return;
+		}
+
+		$hostmask = $event->getHostmask();
+		$nick = $hostmask->getNick();
+		$msg = '['. $hostmask->toString() .'] '. $event->getParam(1);
+		foreach($this->forwards['msgs'] as $target => $junk) {
+			if ($target == $nick) {
+				continue;
+			}
+
+			$event->getServer()->doPrivmsg($target, $msg);
+		}
+	}
 }
