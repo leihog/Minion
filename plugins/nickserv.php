@@ -18,7 +18,7 @@ class NickServ extends Plugin
 
 	public function init()
 	{
-		$this->config = array_merge_recursive($this->defaultConfig, Config::get('plugins/nickserv', []));
+		$this->config = array_replace_recursive($this->defaultConfig, Config::get('plugins/nickserv', []));
 	}
 
 	public function onNotice(IrcEvent $event)
