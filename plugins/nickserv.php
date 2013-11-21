@@ -11,7 +11,7 @@ class NickServ extends Plugin
 	protected $config;
 	protected $defaultConfig = array(
 		'freequest' => array(
-			'hostmask' => 'service@FreeQuest.net',
+			'hostmask' => 'NickServ!service@FreeQuest.net',
 			'trigger' => 'This nickname is registered. Please choose a different nickname',
 		),
 	);
