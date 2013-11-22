@@ -6,7 +6,7 @@ class Chuck extends Plugin
 {
 	public function cmdChuck($event)
 	{
-		$result = $this->get("http://api.icndb.com/jokes/random");
+		$result = $this->getUrl("http://api.icndb.com/jokes/random");
 		if ($result) {
 			$result = json_decode($result, true);
 			if (isset($result['joke'])) {
