@@ -1,6 +1,19 @@
 <?php
+/*
+ * Lookup spotify urls using the open lookup API 
+ * @see https://developer.spotify.com/technologies/web-api/lookup/
+ *
+ * Config options:
+ *   opinionated: value from 0-100, represents the chance of responding with an opinion.
+ *
+ * Example:
+ *  Dude:   have you heard http://open.spotify.com/track/6iHHu7yp9R9Tey6cb8hP4K
+ *  Minion: track Cardiac Rhythm by Snowgoons (spotify)
+ *  Minion: One of my favorite tracks // If configured to have an opinion
+ */
 namespace Bot\Plugin;
 use Bot\Bot as Bot;
+use Bot\Config as Config;
 
 class Spotify extends Plugin
 {
@@ -52,11 +65,13 @@ class Spotify extends Plugin
 		case 'track':
 			$track = $data['track']['name'];
 			$artist = array_shift($data['track']['artists']);
-
 			$response = ["track {$track} by {$artist['name']} (spotify)"];
-			$popularity = $this->popularityResponse($data['track']['popularity']);
-			if ($popularity) {
-				$response[] = $popularity;
+
+			$opinionated = Config::get('plugins/spotify/opinionated', 50);
+			if ($opinionated) {
+				if (mt_rand(1, 100) <= $opinionated) {
+					$response[] = $this->popularityResponse($data['track']['popularity']);
+				}
 			}
 
 			return $response;
@@ -67,10 +82,6 @@ class Spotify extends Plugin
 
 	public function popularityResponse($popularity)
 	{
-		if (mt_rand(1, 100) >= 33) {
-			return; // don't respond to often
-		}
-
 		$popularity = 100 * $popularity;
 		switch($popularity) {
 		case $popularity >= 85:
