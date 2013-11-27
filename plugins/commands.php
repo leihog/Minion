@@ -154,4 +154,20 @@ class Commands extends Plugin
 		$uptime = "My uptime is: ". Bot::uptime();
 		$event->respond($uptime);
 	}
+	public function cmdWhoami(IrcEvent $event)
+	{
+		$hostmask = $event->getHostmask();
+		$user = User::fetch($hostmask);
+		if ($user) {
+			$response[] = "You are: ". $user->getName();
+			foreach($user->getHostmasks() as $mask) {
+				$response[] = "  ". $mask;
+			}
+
+			$event->respond($response);
+			return;
+		}
+
+		$event->respond("I don't know anything about you.");
+	}
 }
