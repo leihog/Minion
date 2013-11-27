@@ -142,4 +142,14 @@ class Admin extends Plugin
 		}
 		$event->getServer()->doPrivmsg($event->getSource(), $msg);
 	}
+	public function cmdWhich($event, $cmdName)
+	{
+		$cmdD = Bot::getCommandDaemon();
+		$cmd = $cmdD->getCommand($cmdName);
+		if (!$cmd) {
+			return;
+		}
+
+		$event->respond("The {$cmd['plugin']} plugin gives the {$cmdName} command.");
+	}
 }
