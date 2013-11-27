@@ -75,14 +75,23 @@ class Command
 				}
 
 				$this->commands[$cmdName] = array(
-					'pointer' => array($class, $methodName),
-					'total' => $method->getNumberOfParameters() -1,
+					'pointer'  => array($class, $methodName),
+					'total'    => $method->getNumberOfParameters() -1,
 					'required' => $method->getNumberOfRequiredParameters() -1,
+					'plugin'   => $class->getName(),
 				);
 			}
 		}
 	}
 
+	public function getCommand($name)
+	{
+		if (!isset($this->commands[$name])) {
+			return null;
+		}
+
+		return $this->commands[$name];
+	}
 	public function getCommands()
 	{
 		$cmds = array_keys($this->commands);

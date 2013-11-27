@@ -51,7 +51,7 @@ class Handler
 					return false;
 				}
 
-				$this->plugins[ $name ] = $plugin;
+				$this->plugins[$name] = $plugin;
 				Bot::log("Loaded plugin {$plugin->getName()}...");
 
 				Event::dispatch(
