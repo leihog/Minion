@@ -20,7 +20,7 @@ class Irc extends Plugin
 		$networks = Config::get('plugins/irc/networks');
 		foreach($networks as $network) {
 			$adapter = new \Bot\adapter\Stream\Client();
-			$server = new \Bot\Connection\Server($network, $adapter);
+			$server = new \Bot\Irc\Server($network, $adapter);
 
 			if ($server->connect()) {
 				Bot::log("Connected to {$server->getHost()}:{$server->getPort()}");

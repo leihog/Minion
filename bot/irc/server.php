@@ -1,11 +1,11 @@
 <?php
-namespace Bot\Connection;
+namespace Bot\Irc;
 
 use Bot\Bot as Bot;
 use Bot\Irc\Channel as Channel;
 use Bot\Event\Dispatcher as Event;
 
-class Server implements IConnection
+class Server implements \Bot\Connection\IConnection
 {
 	protected $host;
 	protected $port;
