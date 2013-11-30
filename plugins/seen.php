@@ -12,19 +12,17 @@ class Seen extends Plugin
 
 	public function init()
 	{
-		if ( !Bot::getDatabase()->isInstalled($this->getName()) )
-		{
-			echo "Installing plugin ", $this->getName(), "\n";
-			$db = Bot::getDatabase();
-			$db->install( $this->getName(), __DIR__ . '/seen.schema' );
+		if (!\Bot\Schema::isInstalled($this->getName())) {
+			Bot::log("Installing plugin ". $this->getName());
+			$schema = new \Bot\Schema($this->getName(), __DIR__ . '/seen.schema');
+			$schema->install();
 		}
 	}
 
 	public function onJoin( \Bot\Event\Irc $event )
 	{
 		$hostmask = $event->getHostmask();
-		if ( $hostmask->getNick() != $this->getNick() )
-		{
+		if ($hostmask->getNick() != $event->getServer()->getNick()) {
 			$this->registerAction( $hostmask, $event->getParam(0), self::ACTION_JOIN );
 		}
 	}
@@ -44,15 +42,15 @@ class Seen extends Plugin
 	public function onNick( \Bot\Event\Irc $event )
 	{
 		$hostmask = $event->getHostmask();
-		$newNick = $event->getParam(1); /** @todo make sure that this is still correct */
+		$newNick = $event->getParam(0);
 		$channels = $event->getChannels();
 
-		$newHostmask = new \Bot\Hostmask("{$newNick}!{$hostmask->getUsername()}@{$hostmask->getHost()}");
+		$newHostmask = clone $hostmask;
+		$newHostmask->setNick($newNick);
 
-		foreach( $channels as $chan )
-		{
-			$this->registerAction( $hostmask, $chan, self::ACTION_PART );
-			$this->registerAction( $newHostmask, $chan, self::ACTION_JOIN );
+		foreach($channels as $chan) {
+			$this->registerAction($hostmask, $chan, self::ACTION_PART);
+			$this->registerAction($newHostmask, $chan, self::ACTION_JOIN);
 		}
 	}
 
@@ -70,10 +68,8 @@ class Seen extends Plugin
 		$hostmask = $event->getHostmask();
 		$channels = $event->getChannels();
 
-		if ( $hostmask->getNick() != $event->getServer()->getNick() )
-		{
-			foreach( $channels as &$channel )
-			{
+		if ($hostmask->getNick() != $event->getServer()->getNick()) {
+			foreach($channels as &$channel) {
 				$this->registerAction( $hostmask, $channel, self::ACTION_QUIT );
 			}
 		}
@@ -106,32 +102,32 @@ class Seen extends Plugin
 			return;
 		}
 
-		if ( Bot::getPluginHandler()->getPlugin('channel')->isOn($user, $channel) )
-		{
+		$chanObj = $server->getChannel($channel);
+		if (!$chanObj) {
+			$event->respond("I'm not watching that channel.");
+			return;
+		}
+
+		if ($chanObj->hasUser($user)) {
 			$server->doPrivmsg($source, "I see {$user} right now.");
 			return;
 		}
 
 		$db = Bot::getDatabase();
 
-		if ( $channel )
-		{
-			$r = $db->fetch("SELECT channel, added FROM seen WHERE channel = :channel AND nick = :user ORDER BY id DESC LIMIT 1", compact("channel", "cmpuser"));
-		}
-		else
-		{
-			$r = $db->fetch("SELECT channel, added FROM seen WHERE nick = :user ORDER BY id DESC LIMIT 1", compact("channel", "cmpuser"));
+		if ($channel) {
+			$r = $db->fetch("SELECT channel, added FROM seen WHERE channel = :channel AND nick = :cmpuser ORDER BY id DESC LIMIT 1", compact("channel", "cmpuser"));
+		} else {
+			$r = $db->fetch("SELECT channel, added FROM seen WHERE nick = :cmpuser ORDER BY id DESC LIMIT 1", compact("channel", "cmpuser"));
 		}
 
-		if (!$r)
-		{
+		if (!$r) {
 			$server->doPrivmsg($source, $prefix . "I don't remember seeing {$user}.");
 			return;
 		}
 
 		$msg = "{$user} was last seen ";
-		if (!$channel)
-		{
+		if (!$channel) {
 			$msg .= "on {$r['channel']} ";
 		}
 		$msg .= $this->formatTimestamp($r['added']) . ' ago.';
@@ -151,8 +147,7 @@ class Seen extends Plugin
 
 		$db = Bot::getDatabase();
 		$r = $db->execute("INSERT INTO seen (nick, hostmask, channel, action, added) VALUES (:nick, :hostmask, :channel, :action, :added)", $params);
-		if (!$r)
-		{
+		if (!$r) {
 			echo "registerAction failed...\n";
 		}
 	}
