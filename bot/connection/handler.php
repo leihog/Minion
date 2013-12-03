@@ -17,11 +17,10 @@ class Handler
 		$this->resources[$id] = $resource;
 	}
 
-	public function disconnectAll($msg)
+	public function closeAll()
 	{
 		foreach($this->connections as $con) {
-			$con->disconnect($msg);
-			/* $this->removeConnection($con); */
+			$con->close();
 		}
 	}
 
@@ -50,8 +49,7 @@ class Handler
 		foreach($this->resources as $resource) {
 			if (feof($resource)) {
 				$connection = $this->connections[(int)$resource];
-				/* $connection->disconnect(); */
-				$connection->onDisconnected();
+				$connection->onClosed();
 				$this->removeConnection($connection);
 			}
 		}

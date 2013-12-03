@@ -56,7 +56,7 @@ class Bot
 
 		Bot::log("Shutting down ($msg).");
 		$this->engineOn = false;
-		$this->connectionHandler->disconnectAll($msg);
+		$this->connectionHandler->closeAll($msg);
 	}
 
 	protected function init()

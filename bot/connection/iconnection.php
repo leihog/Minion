@@ -3,8 +3,7 @@ namespace Bot\Connection;
 
 Interface IConnection
 {
-	public function connect();
-	public function disconnect($msg = null);
+	public function close($msg = null);
 
 	/**
 	 * Returns a Resource
@@ -21,4 +20,6 @@ Interface IConnection
 	 * Called when a write on the connection will not block.
 	 */
 	public function onCanWrite();
+
+	public function onClosed();
 }

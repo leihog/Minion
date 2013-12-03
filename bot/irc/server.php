@@ -48,6 +48,63 @@ class Server implements \Bot\Connection\IConnection
 		$this->channels = []; //new \Bot\Channels();
 	}
 
+	public function connect()
+	{
+		if (($uri = current($this->serverUris)) !== false) {
+			if ($this->doConnect($uri)) {
+				reset($this->serverUris);
+				return true;
+			} else {
+				if (!next($this->serverUris)) {
+					if (false) {
+						Bot::log('Giving up reconnecting...');
+						return false;
+					}
+					reset($this->serverUris);
+				}
+				// schedule new attempt in 1 min
+				Bot::cron(60, false, [$this, 'connect']);
+			}
+		}
+		return false;
+	}
+
+	public function disconnect($msg = null)
+	{
+		$this->doQuit($msg, true);
+		if ($this->adapter->isConnected()) {
+			$this->adapter->disconnect();
+		}
+	}
+
+	protected function doConnect($uri)
+	{
+		@list($transport, $host, $port) = preg_split('@\://|\:@', $uri);
+		if ($this->adapter->connect($transport, $host, $port)) {
+			// This should probably be stored in the adapter
+			$this->transport = $transport;
+			$this->host = $host;
+			$this->port = $port;
+
+			$this->buffer = '';
+			$this->writeQueue = [];
+			$this->reconnect_enabled = true;
+
+			// initializing anti-client-flood
+			$this->lastChecked = time();
+			$this->allowance = $this->rate;
+
+			Bot::connections()->addConnection($this);
+
+			$this->doNick($this->getNick());
+			$this->doUser($this->getUsername(), $this->getRealname(), $this->getHost());
+
+			return true;
+		}
+
+		return false;
+	}
+
 	protected function handleInput( $line )
 	{
 		if (empty($line)) {
@@ -178,6 +235,15 @@ class Server implements \Bot\Connection\IConnection
 		Event::dispatch($event);
 	}
 
+	protected function parseISupportLine($line)
+	{
+		$line = trim(substr($line, 0, strrpos($line, ':')));
+		$parts = explode(' ', $line);
+		foreach($parts as $part) {
+			@list($key, $value) = explode('=', $part);
+			$this->iSupport[strtolower($key)] = $value;
+		}
+	}
 	/**
 	 * Builds a server command with parameters from the argument list
 	 *
@@ -233,72 +299,11 @@ class Server implements \Bot\Connection\IConnection
 		$this->writeQueue[] = $string;
 	}
 
-	protected function doConnect($uri)
-	{
-		@list($transport, $host, $port) = preg_split('@\://|\:@', $uri);
-		if ($this->adapter->connect($transport, $host, $port)) {
-			// This should probably be stored in the adapter
-			$this->transport = $transport;
-			$this->host = $host;
-			$this->port = $port;
-
-			$this->buffer = '';
-			$this->writeQueue = [];
-			$this->reconnect_enabled = true;
-
-			// initializing anti-client-flood
-			$this->lastChecked = time();
-			$this->allowance = $this->rate;
-
-			Bot::connections()->addConnection($this);
-
-			$this->doNick($this->getNick());
-			$this->doUser($this->getUsername(), $this->getRealname(), $this->getHost());
-
-			return true;
-		}
-
-		return false;
-	}
 
 	// IConnection methods
-	public function connect()
+	public function close($msg = null)
 	{
-		if (($uri = current($this->serverUris)) !== false) {
-			if ($this->doConnect($uri)) {
-				reset($this->serverUris);
-				return true;
-			} else {
-				if (!next($this->serverUris)) {
-					if (false) {
-						Bot::log('Giving up reconnecting...');
-						return false;
-					}
-					reset($this->serverUris);
-				}
-				// schedule new attempt in 1 min
-				Bot::cron(60, false, [$this, 'connect']);
-			}
-		}
-		return false;
-	}
-
-	public function disconnect($msg = null)
-	{
-		$this->doQuit($msg, true);
-		if ($this->adapter->isConnected()) {
-			$this->adapter->disconnect();
-		}
-	}
-
-	protected function parseISupportLine($line)
-	{
-		$line = trim(substr($line, 0, strrpos($line, ':')));
-		$parts = explode(' ', $line);
-		foreach($parts as $part) {
-			@list($key, $value) = explode('=', $part);
-			$this->iSupport[strtolower($key)] = $value;
-		}
+		$this->disconnect($msg);
 	}
 	public function getResource()
 	{
@@ -363,7 +368,7 @@ class Server implements \Bot\Connection\IConnection
 		}
 	}
 
-	public function onDisconnected()
+	public function onClosed()
 	{
 		Bot::log("Lost connection to {$this->getHost()}:{$this->getPort()}");
 		Event::dispatch(
@@ -521,7 +526,7 @@ class Server implements \Bot\Connection\IConnection
 		$this->send( $this->prepare('TOPIC', $args) );
 	}
 
-	public function doQuit( $reason = 'zZz', $skipQueue = false )
+	public function doQuit($reason = 'zZz', $skipQueue = false)
 	{
 		$this->reconnect_enabled = false;
 		$this->send($this->prepare('QUIT', array($reason)), $skipQueue);
