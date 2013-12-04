@@ -51,5 +51,12 @@ return array(
 			'timeout-period' => 3600,
 			'channel-access' => 'ALLOW #world',
 		),
+
+		'udprelay' => array(
+			'require-key' => true,
+			'keys' => array(
+				'abc123' => 'freenode/#world',
+			)
+		),
 	),
 );
