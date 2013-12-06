@@ -118,7 +118,7 @@ class udprelay extends Plugin implements \Bot\Connection\IConnection
 	{
 		foreach($data as $peer => $line) {
 			// Match: abc123 freequest/#world :Hello World
-			if (preg_match("@^(?:([^\s]+)\s)?([a-z]+/.+) :(.+)$@", $line, $matches)) {
+			if (preg_match("@^(?:([^\s]+)\s)?([^:\s]+/[^:\s]+) :(.+)$@", $line, $matches)) {
 				$this->relay($matches[1], $matches[2], $matches[3]);
 			}
 		}
