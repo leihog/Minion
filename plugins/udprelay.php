@@ -7,6 +7,8 @@ use Bot\Config as Config;
 class udprelay extends Plugin implements \Bot\Connection\IConnection
 {
 	protected $resource;
+	protected $keys = [];
+	protected $requireKey;
 
 	// IConnection
 	public function close($msg = null)
@@ -35,6 +37,11 @@ class udprelay extends Plugin implements \Bot\Connection\IConnection
 	{
 		$host = Config::get('plugins/udprelay/host', "127.0.0.1");
 		$port = Config::get('plugins/udprelay/port', 9999);
+		$this->requireKey = Config::get('plugins/udprelay/require-key', true);
+		foreach(Config::get("plugins/udprelay/keys", []) as $key => $channel) {
+			$this->keys[$key] = $channel;
+		}
+
 		if (!$this->listen("udp://{$host}:{$port}")) {
 			return false;
 		}
@@ -67,8 +74,8 @@ class udprelay extends Plugin implements \Bot\Connection\IConnection
 			return;
 		}
 
-		if (Config::get('plugins/udprelay/require-key', true)) {
-			if (empty($key) || Config::get("plugins/udprelay/keys/{$key}", null) != $target) {
+		if ($this->requireKey) {
+			if (empty($key) || !isset($this->keys[$key]) || $this->keys[$key] != $target) {
 				return;
 			}
 		}
@@ -78,7 +85,6 @@ class udprelay extends Plugin implements \Bot\Connection\IConnection
 		if (!$server) {
 			return;
 		}
-
 
 		if ($server->getChannel($channel)) {
 			$server->doPrivmsg($channel, $msg);
