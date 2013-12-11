@@ -333,16 +333,7 @@ class Respond extends Plugin
 			throw new \Exception('No such response.', 666);
 		}
 
-		$db = Bot::getDatabase();
-		$r = $db->execute(
-			"INSERT INTO respond_patterns (response, pattern, type) VALUES(?, ?, 'except')",
-			array($responseName, $pattern)
-		);
-		if ($r) {
-			//$this->patterns[$responseName]['except'][] = $pattern;
-			$this->responses[$responseName]->except[] = $pattern;
-			return true;
-		}
+		return $this->addPattern($responseName, $pattern, 'except');
 	}
 
 	protected function subcmdDelExcept($responseName, $id)
@@ -374,17 +365,8 @@ class Respond extends Plugin
 		if (!isset($this->responses[$responseName])) {
 			throw new \Exception('No such response.', 666);
 		}
-
-		$db = Bot::getDatabase();
-		$r = $db->execute(
-			"INSERT INTO respond_patterns (response, pattern, type) VALUES(?, ?, 'match')",
-			array($responseName, $pattern)
-		);
-		if ($r) {
-			//$this->patterns[$responseName]['match'][] = $pattern;
-			$this->responses[$responseName]->match[] = $pattern;
-			return true;
-		}
+		
+		return $this->addPattern($responseName, $pattern, 'match');
 	}
 
 	protected function subcmdDelMatch($responseName, $id)
@@ -570,6 +552,40 @@ class Respond extends Plugin
 		return $matches;
 	}
 
+	protected function addPattern($responseName, $pattern, $type)
+	{
+		switch($pattern[0]) {
+		/* case '!': */
+		/* 	$pattern = substr($pattern, 1); */
+		/* 	break; */
+
+		case '@': // TODO include all in any order
+			$pattern = substr($pattern, 1);
+			$parts = explode(",", $pattern);
+
+			$pattern = "";
+			foreach($parts as &$part) {
+				$pattern .= "(?=.*\b". preg_quote(trim($part)) ."\b)";
+			}
+			$pattern = "/". $pattern ."/ui";
+
+			break;
+
+		default:
+			$pattern = "/\b". preg_quote($pattern) ."\b/ui";
+		}
+
+		$db = Bot::getDatabase();
+		$r = $db->execute(
+			"INSERT INTO respond_patterns (response, pattern, type) VALUES(?, ?, ?)",
+			array($responseName, $pattern, $type)
+		);
+
+		if ($r) {
+			$this->responses[$responseName]->{$type}[] = $pattern;
+			return true;
+		}
+	}
 	public function respond(IrcEvent $event, $response)
 	{
 		$server = $event->getServer();
@@ -669,16 +685,12 @@ class Respond extends Plugin
 	 */
 	protected function evalMatch(&$msg, &$patterns)
 	{
-		if ( !is_array($patterns) || empty($patterns) ) {
+		if (!is_array($patterns) || empty($patterns)) {
 			return false;
 		}
 
-		foreach( $patterns as $pattern ) {
-			/* if ( stristr($msg, $pattern) === false ) { */
-			/* 	continue; */
-			/* } */
-
-			if ( preg_match('/\b'.$pattern.'\b/ui', $msg) ) {
+		foreach($patterns as $pattern) {
+			if (preg_match($pattern, $msg)) {
 				return true;
 			}
 		}
