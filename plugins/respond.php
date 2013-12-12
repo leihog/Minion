@@ -690,8 +690,14 @@ class Respond extends Plugin
 		}
 
 		foreach($patterns as $pattern) {
-			if (preg_match($pattern, $msg)) {
+			if (strstr($msg, $pattern) !== false) {
 				return true;
+			}
+
+			if ($pattern[0] == '/') {
+				if (preg_match($pattern, $msg)) {
+					return true;
+				}
 			}
 		}
 
