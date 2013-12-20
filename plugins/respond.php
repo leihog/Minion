@@ -690,7 +690,7 @@ class Respond extends Plugin
 		}
 
 		foreach($patterns as $pattern) {
-			if (strstr($msg, $pattern) !== false) {
+			if (stristr($msg, $pattern) !== false) {
 				return true;
 			}
 
