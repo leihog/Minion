@@ -104,7 +104,8 @@ class Server implements \Bot\Connection\IConnection
 
 			$this->doNick($this->getNick());
 			$this->doUser($this->getUsername(), $this->getRealname(), $this->getHost());
-
+			
+			Bot::log("Connected to {$uri}.");
 			return true;
 		}
 
