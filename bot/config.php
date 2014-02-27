@@ -1,10 +1,13 @@
 <?php
 namespace Bot;
 
+use Bot\Event\Dispatcher as Event;
+use Bot\Event\Event as ConfigEvent;
+
 class Config
 {
 	protected static $store = null;
-	protected static $settings = array();
+	protected static $settings = [];
 
 	public static function get( $section, $defaultValue = false )
 	{
@@ -28,19 +31,18 @@ class Config
 
 	public static function init( $dataStore )
 	{
-		if ( !self::$store )
-		{
+		if (!self::$store) {
 			self::$store = $dataStore;
 		}
 	}
 
 	public static function load()
 	{
-		if ( !self::$store )
-		{
+		if (!self::$store) {
 			throw new \Exception("Unable to load config.");
 		}
 
 		self::$settings = self::$store->load();
+		Event::dispatch(new ConfigEvent("configloaded"));
 	}
 }

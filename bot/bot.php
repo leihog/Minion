@@ -89,7 +89,7 @@ class Bot
 			switch($fileExt)
 			{
 			case "php":
-				Config::init( new Config\ArrayStore($configFile) );
+				Config::init(new Config\ArrayStore($configFile));
 				break;
 			default:
 				Bot::log("Unsupported config format.");

@@ -2,6 +2,7 @@
 namespace Bot\Plugin;
 
 use Bot\Bot;
+use Bot\Config as Config;
 
 /**
  * Administrator commands.
@@ -103,6 +104,19 @@ class Admin extends Plugin
 				}
 			}
 		}
+	}
+
+	/**
+	 * @todo Don't reload if config hasn't changed or is invalid.
+	 */
+	public function cmdReconfig(\Bot\Event\Irc $event)
+	{
+		if ($event->isFromChannel()) {
+			return;
+		}
+
+		Config::load();
+		$event->respond("Reloaded bot config.");
 	}
 
 	public function cmdShutdown( \Bot\Event\Irc $event, $msg = 'Matane' )
