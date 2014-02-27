@@ -51,24 +51,12 @@ class Server implements \Bot\Connection\IConnection
 
 	public function connect()
 	{
-		$retryIn = 60;
 		if (($uri = current($this->serverUris)) !== false) {
 			if ($this->doConnect($uri)) {
 				reset($this->serverUris);
 				return true;
 			} else {
-				if (!next($this->serverUris)) {
-					reset($this->serverUris);
-
-					// Increase the reconnect delay with 10 minutes until we reach one hour.
-					if ($this->reconnectDelay != 3600) {
-						$this->reconnectDelay += 600;
-					}
-					$retryIn = $this->reconnectDelay;
-				}
-
-				Bot::log("Will try to connect in {$retryIn} seconds.");
-				Bot::cron($retryIn, false, [$this, 'connect']);
+				$this->scheduleReconnect();
 			}
 		}
 		return false;
@@ -112,6 +100,22 @@ class Server implements \Bot\Connection\IConnection
 		return false;
 	}
 
+	protected function scheduleReconnect()
+	{
+		$retryIn = 60;
+		if (!next($this->serverUris)) {
+			reset($this->serverUris);
+
+			// Increase the reconnect delay with 10 minutes until we reach one hour.
+			if ($this->reconnectDelay != 3600) {
+				$this->reconnectDelay += 600;
+			}
+			$retryIn = $this->reconnectDelay;
+		}
+
+		Bot::log("Will try to connect in {$retryIn} seconds.");
+		Bot::cron($retryIn, false, [$this, 'connect']);
+	}
 	protected function handleInput( $line )
 	{
 		if (empty($line)) {
@@ -383,7 +387,7 @@ class Server implements \Bot\Connection\IConnection
 		);
 
 		if ($this->reconnect_enabled) {
-			$this->connect();
+			$this->scheduleReconnect();
 		}
 	}
 
