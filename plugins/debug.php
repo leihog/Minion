@@ -26,13 +26,13 @@ class Debug extends Plugin
 
 	protected function handleIrcEvent( \Bot\Event\Irc $event )
 	{
-		echo  $event->getRaw(), "\n";
+		Bot::log($event->getRaw());
 
 		$params = $event->getParams();
 		if ( ($c = count($params)) ) {
-			echo "Params: \n";
+			Bot::log("Params:");
 			for( $i=0; $i<$c; $i++ ) {
-				printf("  [%s] %s\n", 1+$i, $params[$i]);
+				Bot::log(sprintf("  [%s] %s\n", 1+$i, $params[$i]));
 			}
 		}
 	}
