@@ -8,14 +8,18 @@ class Timed extends Plugin
 {
 	private $scheduled;
 
+	/**
+	 * @todo only listen to ticks if we have a schedule
+	 */
 	public function init()
 	{
-		$this->scheduled = Config::get("plugins/timed/schedule", []);
-		if (empty($this->scheduled)) {
-			Bot::log("[timed] No scheduled responses in config.");
-			return;
-		}
+		$this->setup();
 		Bot::cron('1i', true, [$this, "onTick"]);
+	}
+
+	public function onConfigLoaded()
+	{
+		$this->setup();
 	}
 
 	public function onTick()
@@ -51,5 +55,12 @@ class Timed extends Plugin
 			}
 		}
 		return $servers;
+	}
+	protected function setup()
+	{
+		$this->scheduled = Config::get("plugins/timed/schedule", []);
+		if (empty($this->scheduled)) {
+			Bot::log("[timed] No scheduled responses in config.");
+		}
 	}
 }
