@@ -11,6 +11,8 @@ use Bot\Bot as Bot;
  *             or as a private message.
  * - Mention:  Not directed at the bot but contains bot nick.
  * - Public:   these are messages sent to a channel.
+ * - Mode:     When selecting a reply either avoid repeating yourself(0)
+ *             or allow repetition(1)
  *
  * @todo utf-8 support would be nice
  * @todo replace preg_match wich calls to ctype_alnum and check for
@@ -52,7 +54,7 @@ class Respond extends Plugin
 
 		$db = Bot::getDatabase();
 		// load responses - We might need to optimize this.
-		$rows = $db->fetchAll("SELECT name, type, chance FROM respond_responses");
+		$rows = $db->fetchAll("SELECT name, type, chance, mode FROM respond_responses");
 		foreach( $rows as $row ) {
 			$this->initResponse($row);
 		}
@@ -259,7 +261,6 @@ class Respond extends Plugin
 			$this->initResponse(array(
 				'name' => $responseName,
 				'type' => $type,
-				'chance' => 100,
 			));
 			return true;
 		}
@@ -302,6 +303,28 @@ class Respond extends Plugin
 			);
 			if ($r) {
 				$this->responses[$responseName]->chance = $chance;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	protected function subcmdsSetMode($responseName, $mode)
+	{
+		if (!isset($this->responses[$responseName])) {
+			throw new \Exception('No such response.', 666);
+		}
+
+		if (in_array($mode, [0, 1])) {
+			$db = Bot::getDatabase();
+			$r = $db->execute(
+				"UPDATE respond_responses SET mode = ? WHERE name = ?",
+				array($mode, $responseName)
+			);
+
+			if ($r) {
+				$this->responses[$responseName]->mode = $mode;
 				return true;
 			}
 		}
@@ -617,27 +640,28 @@ class Respond extends Plugin
 	protected function getReply($group)
 	{
 		$replies =& $this->responses[$group]->replies;
-		if ( sizeof($replies) == 1 ) {
+		if (sizeof($replies) == 1) {
 			return $replies[0];
 		}
 
-		$lottery = array();
-		if ( !empty($this->responses[$group]->rhits) ) {
+		$count = 0;
+		$lottery = [];
+		if ($this->responses[$group]->mode == 0 && !empty($this->responses[$group]->rhits)) {
 			foreach ( array_keys($replies) as $key ) {
 				if ( !isset($this->responses[$group]->rhits[$key]) ) {
 					$lottery[] = $key;
 				}
 			}
+			$count = count($lottery);
 		}
 
-		$count = count($lottery);
-		if ( $count == 0 ) {
+		if ($count == 0) {
 			$lottery = array_keys($replies);
 			$count = count($lottery);
 			$this->responses[$group]->rhits = array();
 		}
-		
-		if ( $count == 1 ) {
+
+		if ($count == 1) {
 			$winner = $lottery[0];
 		} else {
 			$winner = $lottery[ (mt_rand(1, $count) -1) ];
@@ -667,7 +691,7 @@ class Respond extends Plugin
 
 			// If chance is larger than $response->chance then we skip.
 			$chance = mt_rand(1, 100);
-			if ( $chance  > $response->chance ) {
+			if ($chance > $response->chance) {
 				continue;
 			}
 			return $response->name;
@@ -778,14 +802,17 @@ class Respond extends Plugin
 
 	protected function initResponse($data)
 	{
+		$data += ['chance' => 100, 'mode' => 0];
+
 		$response = new \StdClass();
 		$response->name    = $data['name'];
 		$response->type    = $data['type'];
 		$response->chance  = $data['chance'];
-		$response->replies = array();
-		$response->match   = array();
-		$response->except  = array();
-		$response->rhits   = array();
+		$response->mode    = $data['mode'];
+		$response->replies = [];
+		$response->match   = [];
+		$response->except  = [];
+		$response->rhits   = [];
 
 		$this->responses[$response->name] = $response;
 		$this->groupResponse($response);
