@@ -28,7 +28,7 @@ class Timed extends Plugin
 			return;
 		}
 
-		$now = date("h:i");
+		$now = date("H:i");
 		if (!isset($this->scheduled[$now])) {
 			return;
 		}
