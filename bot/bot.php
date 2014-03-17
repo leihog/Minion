@@ -120,10 +120,12 @@ class Bot
 			$this->connectionHandler = new Connection\Handler();
 
 			$this->pluginHandler = new Plugin\Handler($this->pluginDirectory);
+			$this->cron->schedule('1i', true, [$this->pluginHandler, 'onHeartbeat']);
+
 			$this->commandDaemon = new Command();
 
-			Event\Dispatcher::addListener( $this->commandDaemon );
-			Event\Dispatcher::addListener( $this->pluginHandler );
+			Event\Dispatcher::addListener($this->commandDaemon);
+			Event\Dispatcher::addListener($this->pluginHandler);
 
 			$plugins = Config::get('autoload');
 			foreach($plugins as $plugin) {
