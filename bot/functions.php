@@ -30,3 +30,19 @@ function array_rand_value(array $array)
 {
 	return $array[array_rand($array, 1)];
 }
+
+function array_path($arr, $path, $defaultValue = null) {
+	if (strpos($path, '/') !== false) {
+		$sections = explode('/', $path);
+		while (($section = array_shift($sections))) {
+			if (isset($arr[$section])) {
+				$arr = $arr[$section];
+			} else {
+				return $defaultValue;
+			}
+		}
+		return $arr;
+	}
+
+	return (isset($arr[$path]) ? $arr[$path] : $defaultValue);
+}
