@@ -31,6 +31,44 @@ class Spotify extends Plugin
 		),
 	);
 
+	protected function extractTrack($data)
+	{
+		$track = [];
+		if (isset($data['name'])) {
+			if (!preg_match("@spotify:track:([a-z0-9]{22})@i", $data['href'], $match)) {
+				return null;
+			}
+
+			$track['id']  = $match[1];
+			$track['url'] = "http://open.spotify.com/track/". $match[1];
+			$track['name'] = $data['name'];
+
+			$artists = [];
+			foreach($data['artists'] as $artist) {
+				$artists[] = $artist['name'];
+			}
+			$track['artist'] = implode(", ", $artists);
+		}
+
+		return $track;
+	}
+
+	public function cmdFindsong($event, $query)
+	{
+		if (!$query) {
+			return;
+		}
+
+		$url = "http://ws.spotify.com/search/1/track.json?q={$query}";
+		$result = $this->getUrl($url);
+		$result = json_decode($result, true);
+		$index = array_rand($result["tracks"]);
+
+		$track = $this->extractTrack($result["tracks"][$index]);
+		$response = "{$track['name']} by {$track['artist']} ({$track['url']})";
+		$event->respond($response);
+	}
+
 	public function onPrivmsg($event)
 	{
 		if (!preg_match("@spotify[^\s]+(track|album|artist)[:/]{1}([a-z0-9]{22})@i", $event->getParam(1), $match)) {
