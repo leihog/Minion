@@ -97,15 +97,16 @@ class Respond extends Plugin
 			}
 		}
 
+		$capture = null;
 		$msg = $event->getParam(1);
 		$type = $this->getMessageType($event);
-		$response = $this->getResponse($type, $msg);
-		if ( !$response ) {
+		$response = $this->getResponse($type, $msg, $capture);
+		if (!$response) {
 			return; // No match
 		}
 
 		$reply = $this->getReply($response);
-		$this->respond($event, $reply);
+		$this->respond($event, $reply, $capture);
 	}
 
 	/**
@@ -324,7 +325,7 @@ class Respond extends Plugin
 			);
 
 			if ($r) {
-				$this->responses[$responseName]->mode = $mode;
+				$this->responses[$responseName]->chance = $chance;
 				return true;
 			}
 		}
@@ -423,7 +424,7 @@ class Respond extends Plugin
 		}
 
 		list($cmd, ) = explode(' ', $reply, 2);
-		if ( !in_array($cmd, array('say', 'emote')) ) {
+		if ( !in_array($cmd, array('say', 'emote', 'exec')) ) {
 			throw new \Exception('Invalid reply syntax.', 666);
 		}
 
@@ -578,9 +579,10 @@ class Respond extends Plugin
 	protected function addPattern($responseName, $pattern, $type)
 	{
 		switch($pattern[0]) {
-		/* case '!': */
-		/* 	$pattern = substr($pattern, 1); */
-		/* 	break; */
+		case '!':
+			// TODO need to validate pattern
+			$pattern = substr($pattern, 1);
+			break;
 
 		case '@': // TODO include all in any order
 			$pattern = substr($pattern, 1);
@@ -609,7 +611,8 @@ class Respond extends Plugin
 			return true;
 		}
 	}
-	public function respond(IrcEvent $event, $response)
+
+	public function respond(IrcEvent $event, $response, $captures = [])
 	{
 		$server = $event->getServer();
 		$source = $event->getSource();
@@ -630,6 +633,13 @@ class Respond extends Plugin
 			break;
 		case 'say':
 			$server->doPrivmsg($source, $response);
+			break;
+		case 'exec':
+			if (!empty($captures)) {
+				array_shift($captures);
+				$captures = implode(" ", $captures);
+			}
+			Bot::getCommandDaemon()->execute($event, $response, $captures);
 			break;
 
 		default: // Perhaps we could add KICK or other actions?
@@ -678,14 +688,14 @@ class Respond extends Plugin
 	 * @param string $msg The message we want to respond to.
 	 * @return string response name.
 	 */
-	protected function getResponse($type, $msg)
+	protected function getResponse($type, $msg, &$capture)
 	{
-		foreach ( $this->groupsByType[$type] as $response ) {
-			if ( !$this->evalMatch($msg, $response->match) ) {
+		foreach ($this->groupsByType[$type] as $response) {
+			if (!$this->evalMatch($msg, $response->match, $capture)) {
 				continue; // if match fails then continue search
 			}
 
-			if ( $this->evalMatch($msg, $response->except) ) {
+			if ($this->evalMatch($msg, $response->except)) {
 				continue; // if except matches then continue search
 			}
 
@@ -707,21 +717,15 @@ class Respond extends Plugin
 	 * @param array $patterns
 	 * @return bool true if pattern matches
 	 */
-	protected function evalMatch(&$msg, &$patterns)
+	protected function evalMatch(&$msg, &$patterns, &$captures = null)
 	{
 		if (!is_array($patterns) || empty($patterns)) {
 			return false;
 		}
 
 		foreach($patterns as $pattern) {
-			if (stristr($msg, $pattern) !== false) {
+			if (preg_match($pattern, $msg, $captures)) {
 				return true;
-			}
-
-			if ($pattern[0] == '/') {
-				if (preg_match($pattern, $msg)) {
-					return true;
-				}
 			}
 		}
 
